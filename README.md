@@ -1,0 +1,2 @@
+# snookr
+Snookr: pistelasku zydeemi
