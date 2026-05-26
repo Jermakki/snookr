@@ -4928,6 +4928,10 @@ const PHYS={
   FRICTION:0.001,           // surface friction
   DENSITY:0.00015,          // relative mass
 };
+// Substeps per animation frame. At full power the cue ball travels ~100mm/frame (80mm at 80%),
+// which is > one ball diameter (52.5mm) — without substeps Matter.js tunnels right through balls.
+// 4 substeps → max 25mm/substep at full power, well under PHYS.BRAD (26.25mm).
+const PHYS_SUBSTEPS=4;
 
 // Convert % ↔ mm
 const pct2mm=(x,y)=>({x:x/100*PHYS.W, y:y/100*PHYS.H});
@@ -5008,9 +5012,11 @@ function startBreakShot(){
     const tpLen=Math.sqrt((Pm-Tm)**2+(Py_-Ty_)**2)||1;
     // Unit vector from pocket toward target (approach direction)
     const ldX=(Tm-Pm)/tpLen, ldY=(Ty_-Py_)/tpLen;
-    // Ghost ball center in mm
-    const Gx=Tm+ldX*PHYS.BRAD*2;
-    const Gy=Ty_+ldY*PHYS.BRAD*2;
+    // Ghost ball center in mm — apply aimOffset perpendicular shift matching the 2D visual.
+    // ldX/ldY is pocket→target; the visual perp uses target→pocket basis → match: (ldY, -ldX)
+    const offsetMM=aimOffset*PHYS.BRAD*0.25;
+    const Gx=Tm+ldX*PHYS.BRAD*2 + ldY*offsetMM;
+    const Gy=Ty_+ldY*PHYS.BRAD*2 - ldX*offsetMM;
     dx=Gx-cx_mm; dy=Gy-cy_mm;
 
   } else if(aimTarget&&B[aimTarget]&&!B[aimTarget].potted){
@@ -5032,7 +5038,8 @@ function startBreakShot(){
   }
 
   const dist=Math.sqrt(dx*dx+dy*dy)||1;
-  Body.setVelocity(cueBody,{x:dx/dist*maxSpd/60,y:dy/dist*maxSpd/60});
+  // Velocity is displacement per substep (mm/substep), not per full frame.
+  Body.setVelocity(cueBody,{x:dx/dist*maxSpd/(60*PHYS_SUBSTEPS),y:dy/dist*maxSpd/(60*PHYS_SUBSTEPS)});
 
   phys.active=true;
   phys.t0=Date.now();
@@ -5048,8 +5055,8 @@ function physLoop(ts){
 
   const now=Date.now();
   const elapsed=now-phys.t0;
-  // Step physics (use fixed 16.67ms step for stability)
-  Engine.update(phys.engine,16.67);
+  // Multiple substeps per frame so fast balls don't tunnel through targets.
+  for(let _s=0;_s<PHYS_SUBSTEPS;_s++) Engine.update(phys.engine,16.67/PHYS_SUBSTEPS);
 
   const pkts=physPockets();
   const toRemove=[];
@@ -5091,7 +5098,7 @@ function physLoop(ts){
   window._update3D?.();
 
   // Stop when all balls nearly stationary (speed < 8mm/s) or timeout 12s
-  const allStopped=Object.values(phys.bodies).every(b=>b.speed<0.14); // 0.14 units/tick ≈ 8mm/s
+  const allStopped=Object.values(phys.bodies).every(b=>b.speed<0.14/PHYS_SUBSTEPS); // ≈8mm/s real
   if(allStopped||elapsed>12000){
     stopPhysics();
     snap('manual','⚡ Break shot — pakka hajosi',{sim:true});
