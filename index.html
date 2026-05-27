@@ -2682,15 +2682,16 @@ function arr(sv,x1,y1,x2,y2,col,br){
 /* ═══════════════════════════════════════════════════
    STATS
 ═══════════════════════════════════════════════════ */
-function calcS(pi){
-  const ss=shots.filter(s=>s.player===pi);
+function calcS(pi, shotArr){
+  const src=shotArr||shots;
+  const ss=src.filter(s=>s.player===pi);
   const opp=1-pi;
   const pots=ss.filter(s=>s.pts>0&&s.type!=='foul').length;
   const missedPots=ss.filter(s=>s.type==='missed_pot').length;
   const atts=pots+missedPots||1;
   const longs=ss.filter(s=>s.shotType==='long');
   const longM=longs.filter(s=>s.pts>0).length;
-  const safeList=shots.filter(s=>s.type==='safety'&&s.player===pi);
+  const safeList=src.filter(s=>s.type==='safety'&&s.player===pi);
   const fouls=ss.filter(s=>s.type==='foul').length;
   const totalSec=ss.reduce((a,b)=>a+b.sec,0);
   const avg=ss.length?Math.round(totalSec/ss.length):0;
@@ -2698,8 +2699,8 @@ function calcS(pi){
   // Safety outcome analysis: what did the opponent do after each safety?
   let safeOk=0,safeBroken=0,safeFoul=0,safeExchange=0;
   safeList.forEach(safe=>{
-    const idx=shots.indexOf(safe);
-    const nextOpp=shots.slice(idx+1).find(s=>s.player===opp);
+    const idx=src.indexOf(safe);
+    const nextOpp=src.slice(idx+1).find(s=>s.player===opp);
     if(!nextOpp)return;
     if(nextOpp.pts>0)             safeBroken++;   // opponent potted — safety broken
     else if(nextOpp.type==='foul') safeFoul++;    // opponent fouled — forced error!
@@ -3983,100 +3984,171 @@ function generateReport(){
   // Brief async yield so the "Generating…" message shows
   setTimeout(()=>{
   c.innerHTML='';
-  // ── Match Summary ──
-  const s0=calcS(0),s1=calcS(1);
+
+  // Combine shots from all completed frames + current frame
+  const allShots=[...frameHistory.flatMap(f=>f.frameShots||[]),...shots];
+
+  // Nothing to show?
+  if(!allShots.length&&!frameHistory.length&&!photoLog.length&&!snaps.length){
+    c.innerHTML='<div style="text-align:center;padding:20px;font-size:.7rem;color:var(--dim)">No data yet — play a match first.</div>';
+    return;
+  }
+
+  // ── Helper: stats table card ──
+  function mkStatsCard(s0,s1,label){
+    const div=document.createElement('div');
+    div.className='rpt-section';
+    div.innerHTML=`<div class="rpt-hdr"><b>${label||'Statistics'}</b></div>`;
+    const tbl=document.createElement('table');
+    tbl.className='stbl';tbl.style.margin='8px';tbl.style.width='calc(100% - 16px)';
+    tbl.innerHTML='<tbody></tbody>';
+    const rows=[
+      {l:'Pots',v0:pct(s0.pots,s0.atts)+'%',v1:pct(s1.pots,s1.atts)+'%',
+       s0:`${s0.pots}/${s0.atts}`,s1:`${s1.pots}/${s1.atts}`},
+      {l:'Long shots',v0:pct(s0.longM,s0.longT)+'%',v1:pct(s1.longM,s1.longT)+'%',
+       s0:`${s0.longM}/${s0.longT}`,s1:`${s1.longM}/${s1.longT}`},
+      {l:'Safeties',v0:''+s0.safeN,v1:''+s1.safeN,
+       s0:s0.safeN?`✓${s0.safeOk} 🎱${s0.safeBroken} ⛔${s0.safeFoul}`:'—',
+       s1:s1.safeN?`✓${s1.safeOk} 🎱${s1.safeBroken} ⛔${s1.safeFoul}`:'—'},
+      {l:'Avg shot',v0:s0.avg+'s',v1:s1.avg+'s',s0:'',s1:''},
+      {l:'Table time',v0:fmtT(s0.totalSec),v1:fmtT(s1.totalSec),
+       s0:s0.n+' shots',s1:s1.n+' shots'},
+    ];
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td><b>${r.v0}</b><span class="ssub">${r.s0}</span></td>
+        <td>${r.l}</td><td><b>${r.v1}</b><span class="ssub">${r.s1}</span></td>`;
+      tbl.querySelector('tbody').appendChild(tr);
+    });
+    div.appendChild(tbl);
+    return div;
+  }
+
+  // ── Helper: summary card ──
+  function mkSummaryCard(hdrLabel, hdrSub, bigL, bigR, bigLlbl, bigRlbl, s0, s1){
+    const div=document.createElement('div');
+    div.className='rpt-section';
+    div.innerHTML=`
+      <div class="rpt-hdr">
+        <b>${hdrLabel}</b>
+        <span style="font-size:.55rem;color:var(--dim)">${hdrSub||''}</span>
+      </div>
+      <div class="rpt-body">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="text-align:center;flex:1">
+            <div style="font-size:.65rem;color:var(--p1);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">${pNames[0]}</div>
+            <div style="font-size:3rem;font-weight:700;color:var(--p1);line-height:1">${bigL}</div>
+            ${bigLlbl?`<div style="font-size:.58rem;color:var(--dim);margin-top:2px">${bigLlbl}</div>`:''}
+          </div>
+          <div style="font-size:1.4rem;color:var(--dim);padding:0 10px">vs</div>
+          <div style="text-align:center;flex:1">
+            <div style="font-size:.65rem;color:var(--p2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">${pNames[1]}</div>
+            <div style="font-size:3rem;font-weight:700;color:var(--p2);line-height:1">${bigR}</div>
+            ${bigRlbl?`<div style="font-size:.58rem;color:var(--dim);margin-top:2px">${bigRlbl}</div>`:''}
+          </div>
+        </div>
+        <div class="rpt-grid">
+          <div class="rpt-stat">
+            <div class="rv" style="color:var(--p1)">${pct(s0.pots,s0.atts)}%</div>
+            <div class="rl">P1 Pots</div>
+          </div>
+          <div class="rpt-stat">
+            <div class="rv" style="color:var(--p2)">${pct(s1.pots,s1.atts)}%</div>
+            <div class="rl">P2 Pots</div>
+          </div>
+          <div class="rpt-stat">
+            <div class="rv" style="color:var(--gold)">${s0.avg}s</div>
+            <div class="rl">P1 Avg Shot</div>
+          </div>
+          <div class="rpt-stat">
+            <div class="rv" style="color:var(--gold)">${s1.avg}s</div>
+            <div class="rl">P2 Avg Shot</div>
+          </div>
+        </div>
+      </div>`;
+    return div;
+  }
+
+  // ── Overall Match Summary ──
   const dur=fmtT(gameSec);
-  const matchCard=document.createElement('div');
-  matchCard.className='rpt-section';
-  matchCard.innerHTML=`
-    <div class="rpt-hdr">
-      <b>Match Summary</b>
-      <span style="font-size:.55rem;color:var(--dim)">${dur} played · ${gameMode} reds</span>
-    </div>
-    <div class="rpt-body">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="text-align:center;flex:1">
-          <div style="font-size:.65rem;color:var(--p1);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">${pNames[0]}</div>
-          <div style="font-size:3rem;font-weight:700;color:var(--p1);line-height:1">${G.scores[0]}</div>
-          <div style="font-size:.58rem;color:var(--dim);margin-top:2px">Frames: ${G.frames[0]}</div>
-        </div>
-        <div style="font-size:1.4rem;color:var(--dim);padding:0 10px">vs</div>
-        <div style="text-align:center;flex:1">
-          <div style="font-size:.65rem;color:var(--p2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">${pNames[1]}</div>
-          <div style="font-size:3rem;font-weight:700;color:var(--p2);line-height:1">${G.scores[1]}</div>
-          <div style="font-size:.58rem;color:var(--dim);margin-top:2px">Frames: ${G.frames[1]}</div>
-        </div>
-      </div>
-      <div class="rpt-grid">
-        <div class="rpt-stat">
-          <div class="rv" style="color:var(--p1)">${pct(s0.pots,s0.atts)}%</div>
-          <div class="rl">P1 Pots</div>
-        </div>
-        <div class="rpt-stat">
-          <div class="rv" style="color:var(--p2)">${pct(s1.pots,s1.atts)}%</div>
-          <div class="rl">P2 Pots</div>
-        </div>
-        <div class="rpt-stat">
-          <div class="rv" style="color:var(--gold)">${s0.avg}s</div>
-          <div class="rl">P1 Avg Shot</div>
-        </div>
-        <div class="rpt-stat">
-          <div class="rv" style="color:var(--gold)">${s1.avg}s</div>
-          <div class="rl">P2 Avg Shot</div>
-        </div>
-      </div>
-    </div>`;
-  c.appendChild(matchCard);
+  const totalFrames=G.frames[0]+G.frames[1];
+  const overallS0=calcS(0,allShots), overallS1=calcS(1,allShots);
 
-  // ── Stats Table ──
-  const statsCard=document.createElement('div');
-  statsCard.className='rpt-section';
-  statsCard.innerHTML=`<div class="rpt-hdr"><b>Statistics</b></div>`;
-  const tbl=document.createElement('table');
-  tbl.className='stbl';tbl.style.margin='8px';tbl.style.width='calc(100% - 16px)';
-  tbl.innerHTML='<tbody></tbody>';
-  const rows=[
-    {l:'Pots',v0:pct(s0.pots,s0.atts)+'%',v1:pct(s1.pots,s1.atts)+'%',
-     s0:`${s0.pots}/${s0.atts}`,s1:`${s1.pots}/${s1.atts}`},
-    {l:'Long shots',v0:pct(s0.longM,s0.longT)+'%',v1:pct(s1.longM,s1.longT)+'%',
-     s0:`${s0.longM}/${s0.longT}`,s1:`${s1.longM}/${s1.longT}`},
-    {l:'Safeties',v0:''+s0.safeN,v1:''+s1.safeN,
-     s0:s0.safeN?`✓${s0.safeOk} 🎱${s0.safeBroken} ⛔${s0.safeFoul}`:'—',
-     s1:s1.safeN?`✓${s1.safeOk} 🎱${s1.safeBroken} ⛔${s1.safeFoul}`:'—'},
-    {l:'Avg shot',v0:s0.avg+'s',v1:s1.avg+'s',s0:'',s1:''},
-    {l:'Table time',v0:fmtT(s0.totalSec),v1:fmtT(s1.totalSec),
-     s0:s0.n+' shots',s1:s1.n+' shots'},
-  ];
-  rows.forEach(r=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td><b>${r.v0}</b><span class="ssub">${r.s0}</span></td>
-      <td>${r.l}</td><td><b>${r.v1}</b><span class="ssub">${r.s1}</span></td>`;
-    tbl.querySelector('tbody').appendChild(tr);
+  if(totalFrames>0){
+    // Multi-frame match: show frames won as big number
+    c.appendChild(mkSummaryCard(
+      'Match Summary',
+      dur+' played · '+gameMode+' reds',
+      G.frames[0], G.frames[1],
+      'Frames won', 'Frames won',
+      overallS0, overallS1
+    ));
+  } else if(shots.length>0){
+    // Single frame in progress: show current scores
+    c.appendChild(mkSummaryCard(
+      'Match Summary',
+      dur+' played · '+gameMode+' reds',
+      G.scores[0], G.scores[1],
+      null, null,
+      overallS0, overallS1
+    ));
+  }
+  // (if no shots and no frames, skip match summary card)
+
+  if(allShots.length) c.appendChild(mkStatsCard(overallS0, overallS1, 'Statistics'));
+
+  // ── Per-Frame sections ──
+  frameHistory.forEach((f,i)=>{
+    const fShots=f.frameShots||[];
+    if(!fShots.length) return; // skip empty frames
+    const fS0=calcS(0,fShots), fS1=calcS(1,fShots);
+    const wCol=f.winner===0?'var(--p1)':'var(--p2)';
+    const frameLabel='Frame '+(f.frameNum||i+1);
+    const wText='🏆 '+f.winnerName;
+    const timeTxt=f.timestamp?'· '+f.timestamp:'';
+
+    const fCard=mkSummaryCard(
+      frameLabel,
+      wText+' '+timeTxt,
+      f.finalScore[0], f.finalScore[1],
+      null, null,
+      fS0, fS1
+    );
+    // Tint header to winner's colour
+    fCard.querySelector('.rpt-hdr b').style.color=wCol;
+    c.appendChild(fCard);
+    c.appendChild(mkStatsCard(fS0, fS1, frameLabel+' — Statistics'));
   });
-  statsCard.appendChild(tbl);
-  c.appendChild(statsCard);
 
-  // ── Match Timeline with filters ──
-  if(snaps.length>1){
+  // ── Current frame (only if active shots exist) ──
+  if(shots.length>0){
+    const curS0=calcS(0,shots), curS1=calcS(1,shots);
+    c.appendChild(mkSummaryCard(
+      'Current Frame',
+      'In progress',
+      G.scores[0], G.scores[1],
+      null, null,
+      curS0, curS1
+    ));
+    c.appendChild(mkStatsCard(curS0, curS1, 'Current Frame — Statistics'));
+  }
+
+  // ── Match Timeline — mirrors Timeline tab filters (elogShowMiss / elogShowSnap) ──
+  const rptSnaps=snaps.filter(s=>{
+    if(s.sim) return false;
+    const isMiss=s.type==='turn'&&s.desc?.startsWith('❌');
+    if(isMiss&&!elogShowMiss) return false;
+    if(s.type==='manual'&&!elogShowSnap) return false;
+    return true;
+  });
+  if(rptSnaps.length>1){
     const snapCard=document.createElement('div');
     snapCard.className='rpt-section';
 
-    // Header + filter checkboxes
     const hdr=document.createElement('div');
     hdr.className='rpt-hdr';
-    hdr.style.flexWrap='wrap';hdr.style.gap='6px';
     hdr.innerHTML=`<b>Match Timeline</b>
-      <span style="display:flex;gap:10px;align-items:center;font-size:.6rem;font-weight:400">
-        <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-          <input type="checkbox" id="rptShowMiss" style="accent-color:#cc3333">
-          <span style="color:#cc3333">Misses</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-          <input type="checkbox" id="rptShowSnap" checked style="accent-color:#c9a84c">
-          <span style="color:#c9a84c">Snapshots</span>
-        </label>
-      </span>
-      <span style="font-size:.52rem;color:var(--dim)">${snaps.length} events</span>`;
+      <span style="font-size:.52rem;color:var(--dim)">${rptSnaps.length} events</span>`;
     snapCard.appendChild(hdr);
 
     const list=document.createElement('div');
@@ -4084,63 +4156,44 @@ function generateReport(){
     list.style.cssText='padding:6px 0;display:flex;flex-direction:column';
     snapCard.appendChild(list);
 
-    // Group snaps by frame
-    function buildRptTimeline(){
-      const showMiss=document.getElementById('rptShowMiss')?.checked||false;
-      const showSnap=document.getElementById('rptShowSnap')?.checked!==false;
-      list.innerHTML='';
-      let lastFrame=-1;
-      snaps.filter(s=>!s.sim).forEach((s,i)=>{
-        const isMiss=s.type==='turn'&&(s.desc?.startsWith('❌')||s.type==='missed_pot');
-        const isManualSnap=s.type==='manual';
-        if(isMiss&&!showMiss) return;
-        if(isManualSnap&&!showSnap) return;
-
-        // Frame divider
-        const fn=s._frame||1;
-        if(fn!==lastFrame&&snaps.some(x=>x._frame>1)){
-          lastFrame=fn;
-          const fEntry=frameHistory[fn-1];
-          const fdiv=document.createElement('div');
-          fdiv.style.cssText='padding:6px 12px 3px;font-size:.6rem;font-weight:800;color:#c9a84c;'
-            +'text-transform:uppercase;letter-spacing:.08em;'+(fn>1?'border-top:1.5px solid var(--border);margin-top:4px':'');
-          fdiv.textContent='Frame '+fn+(fEntry?' — 🏆 '+fEntry.winnerName:'');
-          list.appendChild(fdiv);
-        }
-
-        const row=document.createElement('div');
-        row.style.cssText='display:flex;align-items:flex-start;gap:8px;padding:5px 12px;'
-          +'border-bottom:1px solid rgba(255,255,255,.05);font-size:.62rem;cursor:pointer';
-        const dotCol=EVC[s.type]||'#6aaa6a';
-        const noPlayer=s.type==='start'||s.type==='end'||s.type==='manual'||s.player==null;
-        const pCol=s.player===0?'#4aacee':'#ee9940';
-        const pSuffix=noPlayer?'':`<span style="color:${pCol}"> (${pNames[s.player]||'P'+(s.player+1)})</span>`;
-
-        let imgHtml='';
-        if(s.img&&showSnap){
-          imgHtml=`<img src="${s.img}" style="height:160px;width:auto;max-width:200px;`
-            +`object-fit:cover;border-radius:7px;border:1px solid var(--border);`
-            +`flex-shrink:0;margin-top:1px">`;
-        }
-
-        row.innerHTML=`<div style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;margin-top:3px"></div>
-          <div style="flex:1;min-width:0">
-            <div style="color:var(--text)">${s.desc}${pSuffix}</div>
-            <div style="color:var(--dim);font-size:.54rem;margin-top:1px">${fmtT(s.gt)} · ${s.G.scores[0]}–${s.G.scores[1]}</div>
-          </div>
-          ${imgHtml}`;
-        row.addEventListener('click',()=>{showTab(3);jumpTo(i);});
-        list.appendChild(row);
-      });
-      if(!list.children.length){
-        list.innerHTML='<div style="padding:10px 12px;font-size:.6rem;color:var(--dim)">Ei tapahtumia nykyisillä filttereillä</div>';
+    let lastFrame=-1;
+    rptSnaps.forEach((s,i)=>{
+      // Frame divider
+      const fn=s._frame||1;
+      if(fn!==lastFrame&&snaps.some(x=>x._frame>1)){
+        lastFrame=fn;
+        const fEntry=frameHistory[fn-1];
+        const fdiv=document.createElement('div');
+        fdiv.style.cssText='padding:6px 12px 3px;font-size:.6rem;font-weight:800;color:#c9a84c;'
+          +'text-transform:uppercase;letter-spacing:.08em;'+(fn>1?'border-top:1.5px solid var(--border);margin-top:4px':'');
+        fdiv.textContent='Frame '+fn+(fEntry?' — 🏆 '+fEntry.winnerName:'');
+        list.appendChild(fdiv);
       }
-    }
-    buildRptTimeline();
-    ['rptShowMiss','rptShowSnap'].forEach(id=>{
-      const cb=document.getElementById(id);
-      if(cb) cb.addEventListener('change',buildRptTimeline);
+
+      const hasImg=s.img&&elogShowSnap;
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:'+(hasImg?'flex-start':'center')+';gap:8px;padding:5px 12px;'
+        +'border-bottom:1px solid rgba(255,255,255,.05);font-size:.62rem;cursor:pointer';
+      const dotCol=EVC[s.type]||'#6aaa6a';
+      const noPlayer=s.type==='start'||s.type==='end'||s.type==='manual'||s.player==null;
+      const pCol=s.player===0?'#4aacee':'#ee9940';
+      const pSuffix=noPlayer?'':`<span style="color:${pCol}"> (${pNames[s.player]||'P'+(s.player+1)})</span>`;
+      const imgHtml=hasImg
+        ?`<img src="${s.img}" style="height:120px;width:auto;max-width:160px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;margin-top:1px">`
+        :'';
+
+      row.innerHTML=`<div style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;margin-top:${hasImg?3:0}px"></div>
+        <div style="flex:1;min-width:0">
+          <div style="color:var(--text)">${s.desc}${pSuffix}</div>
+          <div style="color:var(--dim);font-size:.54rem;margin-top:1px">${fmtT(s.gt)} · ${s.G.scores[0]}–${s.G.scores[1]}</div>
+        </div>
+        ${imgHtml}`;
+      row.addEventListener('click',()=>{showTab(3);jumpTo(i);});
+      list.appendChild(row);
     });
+    if(!list.children.length){
+      list.innerHTML='<div style="padding:10px 12px;font-size:.6rem;color:var(--dim)">Ei tapahtumia</div>';
+    }
     c.appendChild(snapCard);
   }
 
@@ -4195,9 +4248,6 @@ function generateReport(){
     c.appendChild(fhCard);
   }
 
-  if(!snaps.length&&!shots.length&&!frameHistory.length&&!photoLog.length){
-    c.innerHTML='<div style="text-align:center;padding:20px;font-size:.7rem;color:var(--dim)">No data yet — play a match first.</div>';
-  }
   // Scroll report content into view
   c.scrollIntoView({behavior:'smooth',block:'start'});
   },30); // end setTimeout
@@ -4924,7 +4974,7 @@ const PHYS={
   POCKET_R:58,              // pocket sink radius mm (slightly larger than ball)
   WALL_R:0.97,              // cushion restitution
   BALL_R:0.975,             // ball-ball restitution
-  FRICTION_AIR:0.014,       // rolling friction (tune for feel)
+  FRICTION_AIR:0.007,       // rolling friction — halved so full power reaches end-to-end (~3570mm)
   FRICTION:0.001,           // surface friction
   DENSITY:0.00015,          // relative mass
 };
@@ -4997,7 +5047,7 @@ function startBreakShot(){
   if(!cueBody){stopPhysics();return;}
 
   const power=(+document.getElementById('powerSlider')?.value||80)/100;
-  const maxSpd=6000*power; // mm/s at full power
+  const maxSpd=7000*power; // mm/s — at 100% reaches ~end-to-end (3570mm) with margin
   const {x:cx_mm,y:cy_mm}=pct2mm(B['cue'].x,B['cue'].y);
 
   let dx,dy;
