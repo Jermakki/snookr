@@ -110,13 +110,13 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
 .potgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
 .sq{aspect-ratio:1;border-radius:12px;cursor:pointer;border:none;
      display:flex;flex-direction:column;align-items:center;justify-content:center;
-     font-family:inherit;font-size:1.4rem;font-weight:700;
+     font-family:inherit;font-size:2.2rem;font-weight:700;
      color:rgba(255,255,255,.92);text-shadow:1px 2px 4px rgba(0,0,0,.65);
      transition:transform .1s;user-select:none;
      box-shadow:0 4px 12px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.14)}
 .sq:active{transform:scale(.88)}
 .sq.fi{opacity:.3!important;filter:grayscale(1)!important;pointer-events:none!important}
-.sq .sub{font-size:.58rem;font-weight:400;opacity:.68;letter-spacing:.04em;margin-top:1px}
+.sq .sub{font-size:.78rem;font-weight:400;opacity:.68;letter-spacing:.04em;margin-top:1px}
 .sq.red{background:linear-gradient(145deg,#e03030,#901010)}
 .sq.ylw{background:linear-gradient(145deg,#d9b800,#8a7200)}
 .sq.grn{background:linear-gradient(145deg,#289838,#155020)}
@@ -744,17 +744,6 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
           📂 Load Saved Game
         </button>
         <input type="file" id="fInp" accept=".json" style="display:none" onchange="loadGame(event)">
-        <!-- Location info -->
-        <div style="background:#080e09;border-radius:8px;padding:9px 11px;font-size:.6rem;
-          color:var(--dim);line-height:1.7;border:1px solid var(--border)">
-          <div style="color:var(--text);font-weight:600;margin-bottom:4px">📁 Where is the file saved?</div>
-          <b style="color:#88aaff">Android:</b> Downloads folder<br>
-          <b style="color:#88aaff">iPhone/iPad:</b> Files app → iCloud Drive or On My iPhone<br>
-          <b style="color:#88aaff">PC/Mac:</b> Browser default download folder<br>
-          <div style="margin-top:5px;color:#6a8a6a">
-            💡 Share the .json via WhatsApp or email — the other player opens it here by pressing "Load Saved Game".
-          </div>
-        </div>
       </div>
     </div>
 
@@ -1101,8 +1090,8 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
     </div>
     <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:20px">
       <button onclick="adjustReds(-1)"
-        style="width:60px;height:60px;border-radius:50%;border:2px solid var(--border);
-          background:var(--panel);color:var(--text);font-size:2rem;font-weight:700;
+        style="width:76px;height:76px;border-radius:50%;border:2px solid var(--border);
+          background:var(--panel);color:var(--text);font-size:2.8rem;font-weight:700;
           cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">
         −
       </button>
@@ -1111,8 +1100,8 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
         <div style="font-size:.55rem;color:var(--dim)">reds</div>
       </div>
       <button onclick="adjustReds(+1)"
-        style="width:60px;height:60px;border-radius:50%;border:2px solid var(--border);
-          background:var(--panel);color:var(--text);font-size:2rem;font-weight:700;
+        style="width:76px;height:76px;border-radius:50%;border:2px solid var(--border);
+          background:var(--panel);color:var(--text);font-size:2.8rem;font-weight:700;
           cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">
         +
       </button>
@@ -1121,10 +1110,10 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
     <label id="freeBallRow" style="display:flex;align-items:center;justify-content:center;
       gap:9px;cursor:pointer;margin-bottom:18px;padding:10px 14px;
       border-radius:10px;border:1.5px solid var(--border);background:var(--panel2)">
-      <input type="checkbox" id="freeBallCb" style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer">
-      <span style="font-size:.75rem;font-weight:700;color:var(--text);text-transform:uppercase;
+      <input type="checkbox" id="freeBallCb" style="width:24px;height:24px;accent-color:var(--gold);cursor:pointer">
+      <span style="font-size:1rem;font-weight:700;color:var(--text);text-transform:uppercase;
         letter-spacing:.07em">Free ball</span>
-      <span style="font-size:.55rem;color:var(--dim)">— active for next entry only</span>
+      <span style="font-size:.65rem;color:var(--dim)">— active for next entry only</span>
     </label>
     <div style="display:flex;gap:8px">
       <button onclick="closeRedsEdit(false)"
@@ -1288,6 +1277,54 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
           <input type="radio" name="photosrc" id="psSrcGal" value="gallery" style="accent-color:#88aaff;width:15px;height:15px">
           🖼 Gallery
         </label>
+      </div>
+    </div>
+
+    <!-- ── Practice Patterns ──────────────────────────── -->
+    <div style="background:var(--panel);border:2px solid #334433;border-radius:11px;padding:12px;margin-bottom:10px">
+      <div style="font-size:.78rem;font-weight:700;color:var(--gold);letter-spacing:.06em;margin-bottom:10px">🎯 Practice Patterns</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+
+        <!-- I — line -->
+        <button onclick="setPracticePattern('line')"
+          style="flex:1;padding:10px 6px;border-radius:9px;border:1.5px solid var(--border);
+            background:var(--panel2);color:var(--text);font-family:inherit;cursor:pointer;
+            display:flex;flex-direction:column;align-items:center;gap:6px">
+          <svg width="54" height="20" viewBox="0 0 54 20" style="pointer-events:none">
+            <line x1="4" y1="10" x2="50" y2="10" stroke="#444" stroke-width="1"/>
+            <circle cx="4"  cy="10" r="3" fill="#cc2222"/>
+            <circle cx="12" cy="10" r="3" fill="#cc2222"/>
+            <circle cx="20" cy="10" r="3" fill="#cc2222"/>
+            <circle cx="28" cy="10" r="3" fill="#cc2222"/>
+            <circle cx="36" cy="10" r="3" fill="#cc2222"/>
+            <circle cx="44" cy="10" r="3" fill="#cc2222"/>
+            <circle cx="52" cy="10" r="3" fill="#cc2222"/>
+          </svg>
+          <span style="font-size:.72rem;font-weight:700;letter-spacing:.06em;pointer-events:none">I — Line</span>
+        </button>
+
+        <!-- T — shape -->
+        <button onclick="setPracticePattern('T')"
+          style="flex:1;padding:10px 6px;border-radius:9px;border:1.5px solid var(--border);
+            background:var(--panel2);color:var(--text);font-family:inherit;cursor:pointer;
+            display:flex;flex-direction:column;align-items:center;gap:6px">
+          <svg width="54" height="32" viewBox="0 0 54 32" style="pointer-events:none">
+            <line x1="4" y1="8"  x2="50" y2="8"  stroke="#444" stroke-width="1"/>
+            <line x1="27" y1="8" x2="27" y2="30" stroke="#444" stroke-width="1"/>
+            <circle cx="4"  cy="8"  r="3" fill="#cc2222"/>
+            <circle cx="14" cy="8"  r="3" fill="#cc2222"/>
+            <circle cx="24" cy="8"  r="3" fill="#cc2222"/>
+            <circle cx="34" cy="8"  r="3" fill="#cc2222"/>
+            <circle cx="44" cy="8"  r="3" fill="#cc2222"/>
+            <circle cx="27" cy="16" r="3" fill="#cc2222"/>
+            <circle cx="27" cy="24" r="3" fill="#cc2222"/>
+          </svg>
+          <span style="font-size:.72rem;font-weight:700;letter-spacing:.06em;pointer-events:none">T — Shape</span>
+        </button>
+
+      </div>
+      <div style="font-size:.54rem;color:var(--dim);line-height:1.6">
+        Places reds in the selected formation on the 2D table. Coloured balls stay on their spots.
       </div>
     </div>
 
@@ -1876,6 +1913,12 @@ function scoreIt(type,color,pts,ballId){
     const sb=document.getElementById('st-std');
     if(sb){sb.classList.add('on');sb.textContent='Standard';}
   }
+  // Long is a one-shot label — revert to Standard automatically after each pot
+  if(shotType==='long'){
+    shotType='std';
+    const sb=document.getElementById('st-std');
+    if(sb){sb.classList.add('on');sb.textContent='Standard';}
+  }
   updateUI();flashScore(p);resetShotTimer();
   startShootout(); // player potted — restart timer for next shot
 }
@@ -1925,9 +1968,10 @@ function setTurn(player){
     color:isSafe?'#3377cc':'#884444'});
   G.breaks[G.cp-1]=0;
   G.cp=player;
+  resetShotTimer();lastPotType='none';freeBallNext=false;updateFreeBallBadge();
+  if(shotType==='long'){shotType='std';const sb=document.getElementById('st-std');if(sb){sb.classList.add('on');sb.textContent='Standard';}}
   updateUI();
   snap('turn',evLabel);
-  resetShotTimer();lastPotType='none';freeBallNext=false;updateFreeBallBadge();
   startShootout();
 }
 
@@ -1939,15 +1983,18 @@ function foul(pts){
   shots.push({player:G.cp-1,type:'foul',shotType:'foul',pts:0,
     sec:Math.round((Date.now()-shotT0)/1000),color:'#cc7700'});
   G.cp=opp+1;
+  resetShotTimer();lastPotType='none';freeBallNext=false;updateFreeBallBadge();setST('std',null);
   updateUI();flashScore(opp);
   snap('foul','⛔ Foul +'+pts+'p');
-  resetShotTimer();lastPotType='none';freeBallNext=false;updateFreeBallBadge();setST('std',null);startShootout();
+  startShootout();
 }
 
 function endTurn(){
   if(reviewing)return;
   G.breaks[G.cp-1]=0;
   G.cp=G.cp===1?2:1;
+  lastPotType='none';freeBallNext=false;updateFreeBallBadge();
+  if(shotType==='long'){shotType='std';const sb=document.getElementById('st-std');if(sb){sb.classList.add('on');sb.textContent='Standard';}}
   updateUI();
   snap('turn','🔄 Turn: '+pNames[G.cp-1]);
   resetShotTimer();
@@ -2078,6 +2125,76 @@ function reRack(){
   if(!confirm('Re-rack? (Scores kept)'))return;
   reRackWithMode(gameMode);
 }
+
+function setPracticePattern(pattern){
+  closeSettings();
+
+  // Restore all coloured balls to their spots
+  CDEFS.forEach(d=>{
+    if(B[d.id]){B[d.id].x=SPOTS[d.spot].x;B[d.id].y=SPOTS[d.spot].y;B[d.id].potted=false;}
+  });
+
+  const reds=Object.entries(B).filter(([,b])=>b.isRed).map(([,b])=>b);
+
+  // Check if a position (px%, py%) would overlap any coloured ball (uses real mm distances)
+  function tooClose(px,py){
+    return CDEFS.some(d=>{
+      const c=B[d.id]; if(!c||c.potted) return false;
+      const dx=(px-c.x)*TW/100, dy=(py-c.y)*TH/100;
+      return Math.sqrt(dx*dx+dy*dy) < BD*1.1; // 1.1× diameter clearance
+    });
+  }
+
+  const allPos=[];
+
+  if(pattern==='line'){
+    // ── I: scan down the centre (x=50%), step 4.5%, skip positions that hit a coloured ball
+    // Coloured balls in the gaps act as "honorary line members"
+    let y=4;
+    while(allPos.length<15 && y<=90){
+      if(!tooClose(50,y)) allPos.push({x:50, y:parseFloat(y.toFixed(1))});
+      y+=4.5;
+    }
+    if(B['cue']){B['cue'].x=50; B['cue'].y=87;}
+
+  } else if(pattern==='T'){
+    // ── T: stem toward BLACK end (top of portrait / left in landscape)
+    //       crossbar at baulk side (lower in portrait / right in landscape)
+    // Pink (y=27.5) and Black (y=9.08) on stem line — gaps appear around them
+
+    // Stem: x=50%, scan from near-black end downward, stop before crossbar at y=45
+    let sy=3;
+    while(allPos.length<8 && sy<43){
+      if(!tooClose(50,sy)) allPos.push({x:50, y:parseFloat(sy.toFixed(1))});
+      sy+=4.5;
+    }
+
+    // Crossbar: y=45%, scan x left to right, step 13%
+    let bx=6;
+    while(allPos.length<15 && bx<=96){
+      if(!tooClose(bx,45)) allPos.push({x:parseFloat(bx.toFixed(1)), y:45});
+      bx+=13;
+    }
+    if(B['cue']){B['cue'].x=50; B['cue'].y=87;}
+  }
+
+  reds.forEach((b,i)=>{
+    if(i<allPos.length){b.x=allPos[i].x; b.y=allPos[i].y; b.potted=false;}
+    else b.potted=true;
+  });
+  G.reds=allPos.length;
+
+  updateUI();
+  // Show 2D tab (tab 5) — initTable reads from B, syncBalls updates DOM
+  if(tblInited) syncBalls(); // already inited: sync immediately
+  showTab(5);
+  setTimeout(()=>{
+    if(tblInited) syncBalls(); // re-sync after tab transition
+    window._update3D?.();
+  },80);
+  setTimeout(()=>snap('manual','🎯 Practice: '+(pattern==='line'?'Line (I)':'T-shape')),150);
+}
+
 
 /* ═══════════════════════════════════════════════════
    UI
@@ -2263,7 +2380,7 @@ function tblManualSnap(btn){
 
 // Live aim line: follows cursor in aim mode (mouse only)
 function aimUpdate(clientX,clientY){
-  if(!aimMode||reviewing)return;
+  if(!aimMode)return;
   const isC=(style==='cartoon');
   const surfId=isC?'ctbl':'ftbl';
   const surf=document.getElementById(surfId);
@@ -2296,7 +2413,6 @@ function aimUpdate(clientX,clientY){
 }
 
 function toggleAim(){
-  if(reviewing)return;
   aimMode=!aimMode;
   const btn=document.getElementById('aimBtn');
   btn.textContent=aimMode?'MOVE':'AIM';
@@ -2348,7 +2464,7 @@ function clearAimSelection(){
 
 // Handle tap on table in aim mode
 function handleAimTap(clientX,clientY,surfId){
-  if(!aimMode||reviewing)return;
+  if(!aimMode)return;
   const isC=surfId==='ctbl';
   const surf=document.getElementById(surfId);
   const rect=surf.getBoundingClientRect();
@@ -2711,6 +2827,24 @@ function calcS(pi, shotArr){
   return{pots,missedPots,atts,longM,longT:longs.length,
          safeN:safeList.length,safeOk,safeBroken,safeFoul,safeExchange,
          fouls,avg,totalSec,n:ss.length};
+}
+
+// Returns sorted top-N breaks for player pi from a shot array
+function topBreaks(pi, shotArr, n){
+  n=n||3;
+  const breaks=[];
+  let cur=0;
+  (shotArr||shots).forEach(s=>{
+    if(s.player!==pi) return;
+    if(s.pts>0&&s.type!=='foul'){
+      cur+=s.pts;
+    } else if(s.type==='missed_pot'||s.type==='safety'||s.type==='foul'||s.type==='miss'){
+      if(cur>0) breaks.push(cur);
+      cur=0;
+    }
+  });
+  if(cur>0) breaks.push(cur);
+  return breaks.sort((a,b)=>b-a).slice(0,n);
 }
 function renderStats(){
   const s0=calcS(0),s1=calcS(1);
@@ -3129,11 +3263,14 @@ function jumpTo(idx){
   if(!reviewing)toggleRev();
   revIdx=Math.max(0,Math.min(snaps.length-1,idx));
   restoreSnap(revIdx);updateCursor();renderElog();
+  // Clear stale aim lines when snapshot changes — user redraws on new positions
+  if(aimMode){clearSvgs();aimTarget=null;aimPocket=null;setAimHint('Tap target ball');}
 }
 function step(dir){
   if(!snaps.length)return;
   revIdx=Math.max(0,Math.min(snaps.length-1,revIdx+dir));
   restoreSnap(revIdx);updateCursor();renderElog();
+  if(aimMode){clearSvgs();aimTarget=null;aimPocket=null;setAimHint('Tap target ball');}
 }
 function togglePlay(){
   const btn=document.getElementById('bPlay');
@@ -3995,7 +4132,7 @@ function generateReport(){
   }
 
   // ── Helper: stats table card ──
-  function mkStatsCard(s0,s1,label){
+  function mkStatsCard(s0,s1,label,b0,b1){
     const div=document.createElement('div');
     div.className='rpt-section';
     div.innerHTML=`<div class="rpt-hdr"><b>${label||'Statistics'}</b></div>`;
@@ -4014,6 +4151,13 @@ function generateReport(){
       {l:'Table time',v0:fmtT(s0.totalSec),v1:fmtT(s1.totalSec),
        s0:s0.n+' shots',s1:s1.n+' shots'},
     ];
+    // Top breaks row
+    if(b0&&b1){
+      const fmt=arr=>arr.length?arr.map((v,i)=>
+        `<span style="color:${i===0?'var(--gold)':i===1?'#aaa':'#777'}">${i===0?'🥇':i===1?'🥈':'🥉'}${v}</span>`
+      ).join(' '):'—';
+      rows.push({l:'Top breaks',v0:fmt(b0),v1:fmt(b1),s0:'',s1:''});
+    }
     rows.forEach(r=>{
       const tr=document.createElement('tr');
       tr.innerHTML=`<td><b>${r.v0}</b><span class="ssub">${r.s0}</span></td>
@@ -4095,7 +4239,8 @@ function generateReport(){
   }
   // (if no shots and no frames, skip match summary card)
 
-  if(allShots.length) c.appendChild(mkStatsCard(overallS0, overallS1, 'Statistics'));
+  if(allShots.length) c.appendChild(mkStatsCard(overallS0, overallS1, 'Statistics',
+    topBreaks(0,allShots), topBreaks(1,allShots)));
 
   // ── Per-Frame sections ──
   frameHistory.forEach((f,i)=>{
@@ -4117,7 +4262,8 @@ function generateReport(){
     // Tint header to winner's colour
     fCard.querySelector('.rpt-hdr b').style.color=wCol;
     c.appendChild(fCard);
-    c.appendChild(mkStatsCard(fS0, fS1, frameLabel+' — Statistics'));
+    c.appendChild(mkStatsCard(fS0, fS1, frameLabel+' — Statistics',
+      topBreaks(0,fShots), topBreaks(1,fShots)));
   });
 
   // ── Current frame (only if active shots exist) ──
@@ -4130,7 +4276,8 @@ function generateReport(){
       null, null,
       curS0, curS1
     ));
-    c.appendChild(mkStatsCard(curS0, curS1, 'Current Frame — Statistics'));
+    c.appendChild(mkStatsCard(curS0, curS1, 'Current Frame — Statistics',
+      topBreaks(0,shots), topBreaks(1,shots)));
   }
 
   // ── Match Timeline — mirrors Timeline tab filters (elogShowMiss / elogShowSnap) ──
@@ -4227,17 +4374,31 @@ function generateReport(){
       <span style="font-size:.55rem;color:var(--dim)">${frameHistory.length} frame${frameHistory.length!==1?"s":""}</span></div>`;
     const fhBody=document.createElement('div');fhBody.style.padding='8px 12px';
     frameHistory.forEach((f,i)=>{
+      const fShots=f.frameShots||[];
+      const fb0=topBreaks(0,fShots), fb1=topBreaks(1,fShots);
+      const brkHtml=(arr,col)=>arr.length
+        ?arr.map((v,j)=>`<span style="color:${j===0?col:'var(--dim)'}">${v}</span>`).join('<span style="color:var(--dim)"> · </span>')
+        :'<span style="color:var(--dim)">—</span>';
       const row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:.68rem';
+      row.style.cssText='padding:7px 0;border-bottom:1px solid var(--border);font-size:.65rem';
       const wCol=f.winner===0?'var(--p1)':'var(--p2)';
       row.innerHTML=`
-        <div style="font-size:1.1rem;font-weight:700;color:${wCol};min-width:22px">${f.frameNum}</div>
-        <div style="flex:1">
-          <span style="font-weight:600;color:${wCol}">${f.winnerName}</span>
-          <span style="color:var(--dim)"> won</span>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="font-size:1.1rem;font-weight:700;color:${wCol};min-width:22px">${f.frameNum}</div>
+          <div style="flex:1">
+            <span style="font-weight:600;color:${wCol}">${f.winnerName}</span>
+            <span style="color:var(--dim)"> won</span>
+          </div>
+          <div style="color:var(--dim);font-size:.6rem">${(f.finalScore||[0,0])[0]}–${(f.finalScore||[0,0])[1]}</div>
+          <div style="color:var(--dim);font-size:.55rem">${f.timestamp||''}</div>
         </div>
-        <div style="color:var(--dim);font-size:.6rem">${(f.finalScore||[0,0])[0]}–${(f.finalScore||[0,0])[1]}</div>
-        <div style="color:var(--dim);font-size:.55rem">${f.timestamp||''}</div>`;
+        <div style="display:flex;gap:6px;font-size:.58rem;padding-left:30px">
+          <span style="color:var(--p1);min-width:28px">${pNames[0]}:</span>
+          <span>${brkHtml(fb0,'var(--p1)')}</span>
+          <span style="color:var(--border);margin:0 2px">|</span>
+          <span style="color:var(--p2);min-width:28px">${pNames[1]}:</span>
+          <span>${brkHtml(fb1,'var(--p2)')}</span>
+        </div>`;
       fhBody.appendChild(row);
     });
     const totRow=document.createElement('div');
@@ -4895,7 +5056,15 @@ Tallennus käynnistyy automaattisesti. Tapahtumat näkyvät listana — napauta 
 <b>Suodattimet:</b> All / ⚠ Errors / P1 / P2<br>
 <b>⏮ ▶ ⏭</b> toistopainikkeet selailuun ja automaattitoistoon.<br>
 <b>💾 Save Game</b> → kysyy tiedostonimen → tallentaa .json<br>
-<b>📂 Load</b> → lataa aiempi peli
+<b>📂 Load</b> → lataa aiempi peli<br><br>
+
+<div style="background:#060f07;border-radius:6px;padding:8px 10px;font-size:.62rem;line-height:1.7;border:1px solid var(--border)">
+<div style="color:var(--text);font-weight:600;margin-bottom:4px">📁 Mihin tiedosto tallentuu?</div>
+<b style="color:#88aaff">Android:</b> Lataukset-kansio<br>
+<b style="color:#88aaff">iPhone/iPad:</b> Tiedostot-sovellus → iCloud Drive tai Omalla iPhonella<br>
+<b style="color:#88aaff">PC/Mac:</b> Selaimen oletuslatauskansioon<br>
+<div style="margin-top:5px;color:#6a8a6a">💡 Jaa .json WhatsAppilla tai sähköpostilla — toinen pelaaja avaa sen tästä "📂 Load Saved Game" -painikkeella.</div>
+</div>
 </div>
 
 <div style="background:#0a140b;border-radius:8px;padding:10px 12px;margin-bottom:10px">
@@ -5016,6 +5185,7 @@ function initPhysEngine(){
 }
 
 function toggleBreakShot(){
+  if(reviewing)return;
   if(phys.active){stopPhysics();return;}
   startBreakShot();
 }
