@@ -613,7 +613,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
         <span id="freeBallBadge" style="display:none;position:absolute;bottom:4px;left:50%;
           transform:translateX(-50%);font-size:.42rem;font-weight:800;color:#1a1200;
           background:var(--gold);border-radius:4px;padding:1px 5px;
-          text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">🎱 FREE BALL</span>
+          text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">FREE BALL</span>
       </div>
     </div>
 
@@ -978,7 +978,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
     </div>
     <div id="3d-load" style="position:absolute;inset:0;background:#0a160c;
       display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:24px;text-align:center">
-      <div style="font-size:2rem">🎱</div>
+      <div style="font-size:2rem"></div>
       <div style="color:#c9a84c;font-size:.9rem;font-weight:600;letter-spacing:.08em">3D Table Viewer</div>
       <div style="color:#5a7a5c;font-size:.65rem;max-width:260px;line-height:1.7">
         Select <b style="color:#c8dcc0">Table.glb</b> from your device.<br>
@@ -1868,7 +1868,7 @@ function sinkBall(id,px,py){
   });
   scoreIt(b.isRed?'red':b.id,b.c,b.pts,id);
   if(!b.isRed&&G.reds>0)setTimeout(()=>returnSpot(id),700);
-  snap(b.isRed?'pot':'colorpot','🎱 '+b.label+' (+'+b.pts+'p)');
+  snap(b.isRed?'pot':'colorpot',b.label+' (+'+b.pts+'p)');
   window._update3D?.();
 }
 function returnSpot(id){
@@ -1932,7 +1932,7 @@ function pot(type,color,pts){
     updateFreeBallBadge();
     // Score it as 1 point, lastPotType → 'red' so color can follow
     scoreIt('red',color,1,null);
-    snap('pot','🎱 Free ball potted (+1p)');
+    snap('pot','Free ball potted (+1p)');
     return;
   }
 
@@ -1951,7 +1951,7 @@ function pot(type,color,pts){
   
   scoreIt(type,color,pts,null);
   snap(type==='red'?'pot':'colorpot',
-    '🎱 '+(type==='red'?'Red':type[0].toUpperCase()+type.slice(1))+' (+'+pts+'p)');
+    (type==='red'?'Red':type[0].toUpperCase()+type.slice(1))+' (+'+pts+'p)');
 }
 
 // FOUL: give points to opponent AND automatically switch turn
@@ -2858,7 +2858,7 @@ function renderStats(){
     {l:'Missed',v0:''+s0.missedPots,v1:''+s1.missedPots,
      s0:'missed pots',s1:'missed pots',b:[s0.missedPots,s1.missedPots]},
     {l:'Safety',v0:''+s0.safeN,v1:''+s1.safeN,
-     s0:s0.safeN?`✓${s0.safeOk} 🎱${s0.safeBroken} ⛔${s0.safeFoul}`:'',
+     s0:s0.safeN?`✓${s0.safeOk} ${s0.safeBroken} ⛔${s0.safeFoul}`:'',
      s1:s1.safeN?`✓${s1.safeOk} 🎱${s1.safeBroken} ⛔${s1.safeFoul}`:'',
      b:[s0.safeN,s1.safeN]},
     {l:'Foul',v0:''+s0.fouls,v1:''+s1.fouls,s0:'fouls',s1:'fouls',b:[s0.fouls,s1.fouls]},
@@ -3136,28 +3136,43 @@ function renderElog(){
   if(cbMiss) elogShowMiss=cbMiss.checked;
   if(cbSnap) elogShowSnap=cbSnap.checked;
 
-  let list=[...snaps].reverse();
-  const withIdx=list.map((s,ri)=>({s,i:snaps.length-1-ri}));
-  const filtered=withIdx.filter(({s})=>{
-    if(s.sim) return false;
-    if(tlFrameFilter>=0 && s._frame!=null && s._frame!==tlFrameFilter+1) return false;
-    // Miss filter: turn events with ❌ desc
+  let grouped = [];
+  let currentBreak = null;
+  
+  snaps.forEach((s, i) => {
+    if(s.sim) return;
+    if(tlFrameFilter>=0 && s._frame!=null && s._frame!==tlFrameFilter+1) return;
     const isMiss=s.type==='turn'&&(s.desc?.startsWith('❌')||s.type==='missed_pot');
-    // Snapshot filter: manual snaps (user-triggered 📷)
     const isManualSnap=s.type==='manual';
-    if(isMiss&&!elogShowMiss) return false;
-    if(isManualSnap&&!elogShowSnap) return false;
-    if(logFilter==='errors') return s.type==='foul'||s.type==='miss'||s.type==='safety'||isMiss;
-    if(logFilter==='p0') return s.player===0;
-    if(logFilter==='p1') return s.player===1;
-    return true;
+    if(isMiss&&!elogShowMiss) return;
+    if(isManualSnap&&!elogShowSnap) return;
+    if(logFilter==='errors' && !(s.type==='foul'||s.type==='miss'||s.type==='safety'||isMiss)) return;
+    if(logFilter==='p0' && s.player!==0) return;
+    if(logFilter==='p1' && s.player!==1) return;
+
+    if(s.type==='pot' || s.type==='colorpot') {
+       if (currentBreak && currentBreak.player === s.player && currentBreak._frame === s._frame) {
+          currentBreak.pots.push({s, i});
+       } else {
+          currentBreak = { isPot: true, player: s.player, _frame: s._frame, pots: [{s, i}] };
+          grouped.push(currentBreak);
+       }
+    } else {
+       currentBreak = null;
+       grouped.push({ isPot: false, s, i });
+    }
   });
+
+  const filtered = grouped.reverse();
+
   if(!filtered.length){
     el.innerHTML='<div style="padding:9px;font-size:.9rem;color:var(--dim)">No events match filter</div>';return;
   }
-  const breakRun=[0,0];
   let lastFrame=-1;
-  filtered.forEach(({s,i},fi)=>{
+  filtered.forEach((grp,fi)=>{
+    const s = grp.isPot ? grp.pots[grp.pots.length-1].s : grp.s;
+    const i = grp.isPot ? grp.pots[grp.pots.length-1].i : grp.i;
+
     // Insert frame divider when _frame changes (reversed list = newest first, so check for change)
     if(s._frame!=null && s._frame!==lastFrame){
       lastFrame=s._frame;
@@ -3174,12 +3189,19 @@ function renderElog(){
       }
     }
     const item=document.createElement('div');
-    item.className='eitem'+(i===revIdx&&reviewing?' on':'');
+    const isOn = (grp.isPot ? grp.pots.some(p=>p.i===revIdx) : i===revIdx) && reviewing;
+    item.className='eitem'+(isOn?' on':'');
     const pi=s.player; 
     const pCol=pi===0?'var(--p1)':'var(--p2)';
     const pName=pNames[pi]||'';
+    
     let desc=s.desc||'';
-    desc=desc.replace(/\s*→\s*\S+\s+plays/,'').replace(/\s*·\s*\S+\s+plays/,'').trim();
+    if(grp.isPot && grp.pots.length > 1){
+      desc = grp.pots.map(p=>p.s.desc.replace(/\s*\(\+\d+p\)/, '').trim()).join(' + ');
+    } else {
+      desc=desc.replace(/\s*→\s*\S+\s+plays/,'').replace(/\s*·\s*\S+\s+plays/,'').trim();
+    }
+    
     let subLine='';
     if(pi!==undefined&&pi!==null&&s.type!=='start'&&s.type!=='end'){
       subLine=`<span style="color:${pCol};font-size:.8rem">${pName}</span>`;
@@ -4140,13 +4162,15 @@ function generateReport(){
     tbl.className='stbl';tbl.style.margin='8px';tbl.style.width='calc(100% - 16px)';
     tbl.innerHTML='<tbody></tbody>';
     const rows=[
-      {l:'Pots',v0:pct(s0.pots,s0.atts)+'%',v1:pct(s1.pots,s1.atts)+'%',
-       s0:`${s0.pots}/${s0.atts}`,s1:`${s1.pots}/${s1.atts}`},
-      {l:'Long shots',v0:pct(s0.longM,s0.longT)+'%',v1:pct(s1.longM,s1.longT)+'%',
-       s0:`${s0.longM}/${s0.longT}`,s1:`${s1.longM}/${s1.longT}`},
-      {l:'Safeties',v0:''+s0.safeN,v1:''+s1.safeN,
-       s0:s0.safeN?`✓${s0.safeOk} 🎱${s0.safeBroken} ⛔${s0.safeFoul}`:'—',
-       s1:s1.safeN?`✓${s1.safeOk} 🎱${s1.safeBroken} ⛔${s1.safeFoul}`:'—'},
+      {l:'Pots',v0:pct(s0.pots,s0.atts)+'% / ['+s0.pots+'/'+s0.atts+']',v1:pct(s1.pots,s1.atts)+'% / ['+s1.pots+'/'+s1.atts+']',
+       s0:'',s1:''},
+      {l:'Long shots',v0:pct(s0.longM,s0.longT)+'% / ['+s0.longM+'/'+s0.longT+']',v1:pct(s1.longM,s1.longT)+'% / ['+s1.longM+'/'+s1.longT+']',
+       s0:'',s1:''},
+      {l:'Safeties',
+       v0:s0.safeN?pct(s0.safeOk+s0.safeFoul, s0.safeN)+'% / '+s0.safeN:'—',
+       v1:s1.safeN?pct(s1.safeOk+s1.safeFoul, s1.safeN)+'% / '+s1.safeN:'—',
+       s0:s0.safeN?`✓${s0.safeOk} ${s0.safeBroken} ⛔${s0.safeFoul}`:'—',
+       s1:s1.safeN?`✓${s1.safeOk} ${s1.safeBroken} ⛔${s1.safeFoul}`:'—'},
       {l:'Avg shot',v0:s0.avg+'s',v1:s1.avg+'s',s0:'',s1:''},
       {l:'Table time',v0:fmtT(s0.totalSec),v1:fmtT(s1.totalSec),
        s0:s0.n+' shots',s1:s1.n+' shots'},
@@ -4154,8 +4178,8 @@ function generateReport(){
     // Top breaks row
     if(b0&&b1){
       const fmt=arr=>arr.length?arr.map((v,i)=>
-        `<span style="color:${i===0?'var(--gold)':i===1?'#aaa':'#777'}">${i===0?'🥇':i===1?'🥈':'🥉'}${v}</span>`
-      ).join(' '):'—';
+        i===0?`<b style="color:var(--gold)">${v}</b>`:v
+      ).join(', '):'—';
       rows.push({l:'Top breaks',v0:fmt(b0),v1:fmt(b1),s0:'',s1:''});
     }
     rows.forEach(r=>{
@@ -4281,21 +4305,36 @@ function generateReport(){
   }
 
   // ── Match Timeline — mirrors Timeline tab filters (elogShowMiss / elogShowSnap) ──
-  const rptSnaps=snaps.filter(s=>{
-    if(s.sim) return false;
+  let groupedRpt = [];
+  let currentBreakRpt = null;
+  
+  snaps.forEach((s, origIdx) => {
+    if(s.sim) return;
     const isMiss=s.type==='turn'&&s.desc?.startsWith('❌');
-    if(isMiss&&!elogShowMiss) return false;
-    if(s.type==='manual'&&!elogShowSnap) return false;
-    return true;
+    if(isMiss&&!elogShowMiss) return;
+    if(s.type==='manual'&&!elogShowSnap) return;
+
+    if(s.type==='pot' || s.type==='colorpot') {
+       if (currentBreakRpt && currentBreakRpt.player === s.player && currentBreakRpt._frame === s._frame) {
+          currentBreakRpt.pots.push({s, origIdx});
+       } else {
+          currentBreakRpt = { isPot: true, player: s.player, _frame: s._frame, pots: [{s, origIdx}] };
+          groupedRpt.push(currentBreakRpt);
+       }
+    } else {
+       currentBreakRpt = null;
+       groupedRpt.push({ isPot: false, s, origIdx });
+    }
   });
-  if(rptSnaps.length>1){
+
+  if(groupedRpt.length>1){
     const snapCard=document.createElement('div');
     snapCard.className='rpt-section';
 
     const hdr=document.createElement('div');
     hdr.className='rpt-hdr';
     hdr.innerHTML=`<b>Match Timeline</b>
-      <span style="font-size:.52rem;color:var(--dim)">${rptSnaps.length} events</span>`;
+      <span style="font-size:.52rem;color:var(--dim)">${groupedRpt.length} events</span>`;
     snapCard.appendChild(hdr);
 
     const list=document.createElement('div');
@@ -4304,7 +4343,10 @@ function generateReport(){
     snapCard.appendChild(list);
 
     let lastFrame=-1;
-    rptSnaps.forEach((s,i)=>{
+    groupedRpt.forEach((grp,i)=>{
+      const s = grp.isPot ? grp.pots[grp.pots.length-1].s : grp.s;
+      const originalIndex = grp.isPot ? grp.pots[grp.pots.length-1].origIdx : grp.origIdx;
+
       // Frame divider
       const fn=s._frame||1;
       if(fn!==lastFrame&&snaps.some(x=>x._frame>1)){
@@ -4329,13 +4371,20 @@ function generateReport(){
         ?`<img src="${s.img}" style="height:120px;width:auto;max-width:160px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;margin-top:1px">`
         :'';
 
+      let desc=s.desc||'';
+      if(grp.isPot && grp.pots.length > 1){
+        desc = grp.pots.map(p=>p.s.desc.replace(/\s*\(\+\d+p\)/, '').trim()).join(' + ');
+      } else {
+        desc=desc.replace(/\s*→\s*\S+\s+plays/,'').replace(/\s*·\s*\S+\s+plays/,'').trim();
+      }
+
       row.innerHTML=`<div style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;margin-top:${hasImg?3:0}px"></div>
         <div style="flex:1;min-width:0">
-          <div style="color:var(--text)">${s.desc}${pSuffix}</div>
+          <div style="color:var(--text)">${desc}${pSuffix}</div>
           <div style="color:var(--dim);font-size:.54rem;margin-top:1px">${fmtT(s.gt)} · ${s.G.scores[0]}–${s.G.scores[1]}</div>
         </div>
         ${imgHtml}`;
-      row.addEventListener('click',()=>{showTab(3);jumpTo(i);});
+      row.addEventListener('click',()=>{showTab(3);jumpTo(originalIndex);});
       list.appendChild(row);
     });
     if(!list.children.length){
@@ -4478,7 +4527,7 @@ function closeRedsEdit(apply){
   });
   updateUI();
   window._update3D?.();
-  snap('manual','🔧 Reds corrected: '+old+' → '+G.reds+(freeBallNext?' · 🎱 Free ball':''));
+  snap('manual','🔧 Reds corrected: '+old+' → '+G.reds+(freeBallNext?' · Free ball':''));
 }
 
 function toggleStrictRules() {
@@ -4633,7 +4682,7 @@ function concede(){
    END GAME — save report + JSON, reset to zero
 ═══════════════════════════════════════════════════ */
 function endGame(){
-  if(reviewing){alert('Sulje Review-tila ensin.');return;}
+  if(reviewing)autoExitRev();
 
   // Step 1: confirm
   const p0=pNames[0]||'Player 1', p1=pNames[1]||'Player 2';
@@ -5043,7 +5092,7 @@ Käytä Camera tai Gallery (asetukset: <b>⚙ Settings → Photo Source</b>). Te
 </div>
 
 <div style="background:#0a140b;border-radius:8px;padding:10px 12px;margin-bottom:10px">
-<div style="color:var(--gold);font-size:.72rem;font-weight:600;margin-bottom:6px">🎱 3D-VÄLILEHTI</div>
+<div style="color:var(--gold);font-size:.72rem;font-weight:600;margin-bottom:6px">3D-VÄLILEHTI</div>
 Lataa <b>Table.glb</b>-tiedosto (📂 Select Table.glb).<br>
 • <b>Pyöritä:</b> raahaa / pinch-to-zoom<br>
 • <b>Pallot</b> synkronoituvat 2D-pöydästä automaattisesti<br>
@@ -5722,3 +5771,15 @@ document.addEventListener('visibilitychange', async () => {
 </script>
 </body>
 </html>
+>
+);
+</script>
+</body>
+</html>
+>
+  }
+});
+</script>
+</body>
+</html>
+>
