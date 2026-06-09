@@ -798,9 +798,9 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
       <table class="stbl" id="stbl"><tbody></tbody></table>
       <div style="font-size:.52rem;color:var(--dim);margin-top:6px;line-height:1.8;
         padding-top:5px;border-top:1px solid var(--border)">
-        Safety: <span style="color:var(--text)">✓ held</span> (opp missed) ·
-        <span style="color:var(--text)">🎱 broken</span> (opp potted) ·
-        <span style="color:var(--text)">⛔ forced foul</span>
+        Safety: <span style="color:var(--text)">Foul %</span> (opp fouled) /
+        <span style="color:var(--text)">Success %</span> (opp 0 pts) /
+        <span style="color:var(--text)">Total</span>
       </div>
       <div id="flogWrap" style="margin-top:8px"></div>
     </div>
@@ -1571,6 +1571,9 @@ function closeSettings(){
    TABS
 ═══════════════════════════════════════════════════ */
 function showTab(n){
+  if (n === 1 && typeof reviewing !== 'undefined' && reviewing) {
+    toggleRev();
+  }
   curTab=n;
   ['pSetup','pScore','pStats','pTimeline','pReport','pTable','p3D'].forEach((id,i)=>{
     document.getElementById(id).classList.toggle('on',i===n);
@@ -2857,10 +2860,10 @@ function renderStats(){
      b:[pct(s0.pots,s0.atts),pct(s1.pots,s1.atts)]},
     {l:'Missed',v0:''+s0.missedPots,v1:''+s1.missedPots,
      s0:'missed pots',s1:'missed pots',b:[s0.missedPots,s1.missedPots]},
-    {l:'Safety',v0:''+s0.safeN,v1:''+s1.safeN,
-     s0:s0.safeN?`✓${s0.safeOk} ${s0.safeBroken} ⛔${s0.safeFoul}`:'',
-     s1:s1.safeN?`✓${s1.safeOk} 🎱${s1.safeBroken} ⛔${s1.safeFoul}`:'',
-     b:[s0.safeN,s1.safeN]},
+    {l:'Safety',
+     v0:s0.safeN?pct(s0.safeFoul,s0.safeN)+'% / '+pct(s0.safeN-s0.safeBroken,s0.safeN)+'% / '+s0.safeN:'—',
+     v1:s1.safeN?pct(s1.safeFoul,s1.safeN)+'% / '+pct(s1.safeN-s1.safeBroken,s1.safeN)+'% / '+s1.safeN:'—',
+     s0:'',s1:'',b:[s0.safeN,s1.safeN]},
     {l:'Foul',v0:''+s0.fouls,v1:''+s1.fouls,s0:'fouls',s1:'fouls',b:[s0.fouls,s1.fouls]},
     {l:'Long shots',v0:pct(s0.longM,s0.longT)+'%',v1:pct(s1.longM,s1.longT)+'%',
      s0:`[${s0.longM}/${s0.longT}]`,s1:`[${s1.longM}/${s1.longT}]`,
@@ -3027,6 +3030,10 @@ function toggleRev(){
     ['rb1','rb2'].forEach(id=>document.getElementById(id).classList.remove('on'));
     ['bPrev','bNext','bPlay'].forEach(id=>document.getElementById(id).disabled=true);
     stopPlay();
+    revIdx = Math.max(0, snaps.length - 1);
+    restoreSnap(revIdx);
+    updateCursor();
+    renderElog();
   }
 }
 function snap(type,desc,opts){
@@ -4167,10 +4174,9 @@ function generateReport(){
       {l:'Long shots',v0:pct(s0.longM,s0.longT)+'% / ['+s0.longM+'/'+s0.longT+']',v1:pct(s1.longM,s1.longT)+'% / ['+s1.longM+'/'+s1.longT+']',
        s0:'',s1:''},
       {l:'Safeties',
-       v0:s0.safeN?pct(s0.safeOk+s0.safeFoul, s0.safeN)+'% / '+s0.safeN:'—',
-       v1:s1.safeN?pct(s1.safeOk+s1.safeFoul, s1.safeN)+'% / '+s1.safeN:'—',
-       s0:s0.safeN?`✓${s0.safeOk} ${s0.safeBroken} ⛔${s0.safeFoul}`:'—',
-       s1:s1.safeN?`✓${s1.safeOk} ${s1.safeBroken} ⛔${s1.safeFoul}`:'—'},
+       v0:s0.safeN?pct(s0.safeFoul,s0.safeN)+'% / '+pct(s0.safeN-s0.safeBroken,s0.safeN)+'% / '+s0.safeN:'—',
+       v1:s1.safeN?pct(s1.safeFoul,s1.safeN)+'% / '+pct(s1.safeN-s1.safeBroken,s1.safeN)+'% / '+s1.safeN:'—',
+       s0:'',s1:''},
       {l:'Avg shot',v0:s0.avg+'s',v1:s1.avg+'s',s0:'',s1:''},
       {l:'Table time',v0:fmtT(s0.totalSec),v1:fmtT(s1.totalSec),
        s0:s0.n+' shots',s1:s1.n+' shots'},
@@ -4682,7 +4688,7 @@ function concede(){
    END GAME — save report + JSON, reset to zero
 ═══════════════════════════════════════════════════ */
 function endGame(){
-  if(reviewing)autoExitRev();
+  if(reviewing)toggleRev();
 
   // Step 1: confirm
   const p0=pNames[0]||'Player 1', p1=pNames[1]||'Player 2';
@@ -5771,15 +5777,3 @@ document.addEventListener('visibilitychange', async () => {
 </script>
 </body>
 </html>
->
-);
-</script>
-</body>
-</html>
->
-  }
-});
-</script>
-</body>
-</html>
->
