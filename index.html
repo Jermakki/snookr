@@ -2142,7 +2142,7 @@ function foul(pts){
   const opp=G.cp===1?1:0;
   G.scores[opp]+=pts;
   G.breaks[G.cp-1]=0;
-  shots.push({player:G.cp-1,type:'foul',shotType:'foul',pts:0,
+  shots.push({player:G.cp-1,type:'foul',shotType:'foul',pts:0,foulPts:pts,
     sec:Math.round((Date.now()-shotT0)/1000),color:'#cc7700'});
   G.cp=opp+1;
   resetShotTimer();lastPotType='none';freeBallNext=false;updateFreeBallBadge();setST('std',null);
@@ -2977,6 +2977,7 @@ function calcS(pi, shotArr){
   const restM=rests.filter(s=>s.pts>0).length;
   const safeList=src.filter(s=>s.type==='safety'&&s.player===pi);
   const fouls=ss.filter(s=>s.type==='foul').length;
+  const foulPts=ss.filter(s=>s.type==='foul').reduce((a,b)=>a+(b.foulPts||0),0);
   const totalSec=ss.reduce((a,b)=>a+b.sec,0);
   const avg=ss.length?Math.round(totalSec/ss.length):0;
 
@@ -2994,7 +2995,7 @@ function calcS(pi, shotArr){
 
   return{pots,missedPots,atts,longM,longT:longs.length,restM,restT:rests.length,
          safeN:safeList.length,safeOk,safeBroken,safeFoul,safeExchange,
-         fouls,avg,totalSec,n:ss.length};
+         fouls,foulPts,avg,totalSec,n:ss.length};
 }
 
 // Returns sorted top-N breaks for player pi from a shot array
@@ -3029,7 +3030,8 @@ function renderStats(){
      v0:s0.safeN?pct(s0.safeFoul,s0.safeN)+'% / '+pct(s0.safeN-s0.safeBroken,s0.safeN)+'% / '+s0.safeN:'—',
      v1:s1.safeN?pct(s1.safeFoul,s1.safeN)+'% / '+pct(s1.safeN-s1.safeBroken,s1.safeN)+'% / '+s1.safeN:'—',
      s0:'',s1:'',b:[s0.safeN,s1.safeN]},
-    {l:'Foul',v0:''+s0.fouls,v1:''+s1.fouls,s0:'fouls',s1:'fouls',b:[s0.fouls,s1.fouls]},
+    {l:'Foul',v0:s0.fouls+' ('+s0.foulPts+')',v1:s1.fouls+' ('+s1.foulPts+')',
+     s0:'fouls (pts)',s1:'fouls (pts)',b:[s0.fouls,s1.fouls]},
     {l:'Long shots',v0:pct(s0.longM,s0.longT)+'%',v1:pct(s1.longM,s1.longT)+'%',
      s0:`[${s0.longM}/${s0.longT}]`,s1:`[${s1.longM}/${s1.longT}]`,
      b:[pct(s0.longM,s0.longT),pct(s1.longM,s1.longT)]},
@@ -4354,6 +4356,8 @@ function generateReport(){
        v0:s0.safeN?pct(s0.safeFoul,s0.safeN)+'% / '+pct(s0.safeN-s0.safeBroken,s0.safeN)+'% / '+s0.safeN:'—',
        v1:s1.safeN?pct(s1.safeFoul,s1.safeN)+'% / '+pct(s1.safeN-s1.safeBroken,s1.safeN)+'% / '+s1.safeN:'—',
        s0:'',s1:''},
+      {l:'Foul',v0:s0.fouls+' ('+s0.foulPts+')',v1:s1.fouls+' ('+s1.foulPts+')',
+       s0:'fouls (pts)',s1:'fouls (pts)'},
       {l:'Avg shot',v0:s0.avg+'s',v1:s1.avg+'s',s0:'',s1:''},
       {l:'Table time',v0:fmtT(s0.totalSec),v1:fmtT(s1.totalSec),
        s0:s0.n+' shots',s1:s1.n+' shots'},
@@ -4425,13 +4429,16 @@ function generateReport(){
   const totalFrames=G.frames[0]+G.frames[1];
   const overallS0=calcS(0,allShots), overallS1=calcS(1,allShots);
 
+  const totP0 = frameHistory.reduce((a,b)=>a+(b.finalScore?.[0]||0), 0) + G.scores[0];
+  const totP1 = frameHistory.reduce((a,b)=>a+(b.finalScore?.[1]||0), 0) + G.scores[1];
+
   if(totalFrames>0){
     // Multi-frame match: show frames won as big number
     c.appendChild(mkSummaryCard(
       'Match Summary',
-      dur+' played · '+gameMode+' reds',
-      G.frames[0], G.frames[1],
-      'Frames won', 'Frames won',
+      dur+' played · '+gameMode+' reds · ' + G.frames[0] + ' ('+totP0+') – ' + G.frames[1] + ' ('+totP1+')',
+      G.frames[0] + ' ('+totP0+')', G.frames[1] + ' ('+totP1+')',
+      'Frames won (total pts)', 'Frames won (total pts)',
       overallS0, overallS1
     ));
   } else if(shots.length>0){
@@ -4440,7 +4447,7 @@ function generateReport(){
       'Match Summary',
       dur+' played · '+gameMode+' reds',
       G.scores[0], G.scores[1],
-      null, null,
+      'Current score', 'Current score',
       overallS0, overallS1
     ));
   }
@@ -4450,20 +4457,25 @@ function generateReport(){
     topBreaks(0,allShots), topBreaks(1,allShots)));
 
   // ── Per-Frame sections ──
+  let runF0=0, runF1=0, runP0=0, runP1=0;
   frameHistory.forEach((f,i)=>{
     const fShots=f.frameShots||[];
     if(!fShots.length) return; // skip empty frames
     const fS0=calcS(0,fShots), fS1=calcS(1,fShots);
     const wCol=f.winner===0?'var(--p1)':'var(--p2)';
+    if(f.winner===0) runF0++; else runF1++;
+    runP0+=(f.finalScore?.[0]||0); runP1+=(f.finalScore?.[1]||0);
+
     const frameLabel='Frame '+(f.frameNum||i+1);
     const wText='🏆 '+f.winnerName;
+    const matchScore='Match: '+runF0+' ('+runP0+') – '+runF1+' ('+runP1+')';
     const timeTxt=f.timestamp?'· '+f.timestamp:'';
 
     const fCard=mkSummaryCard(
       frameLabel,
-      wText+' '+timeTxt,
+      wText+' · '+matchScore+' '+timeTxt,
       f.finalScore[0], f.finalScore[1],
-      null, null,
+      'Frame score', 'Frame score',
       fS0, fS1
     );
     // Tint header to winner's colour
@@ -4635,7 +4647,7 @@ function generateReport(){
     });
     const totRow=document.createElement('div');
     totRow.style.cssText='padding:8px 0;font-size:.7rem;font-weight:600;text-align:center;color:var(--gold)';
-    totRow.textContent='Final: '+pNames[0]+' '+G.frames[0]+' – '+G.frames[1]+' '+pNames[1];
+    totRow.textContent='Final: '+pNames[0]+' '+G.frames[0]+' ('+totP0+') – '+G.frames[1]+' ('+totP1+') '+pNames[1];
     fhBody.appendChild(totRow);
     fhCard.appendChild(fhBody);
     c.appendChild(fhCard);
