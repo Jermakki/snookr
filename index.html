@@ -21,7 +21,7 @@ html,body{height:100%;overflow:hidden;background:#080f09}
 body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
      font-family:'SF Mono',Menlo,monospace;font-size:14px;color:#c8dcc0}
 :root{
-  --gold:#c9a84c;--p1:#4aacee;--p2:#ee9940;
+  --gold:#c9a84c;--p1:#4aacee;--p2:#ee9940;--p3:#66cc66;
   --felt:#2a7a48;--wood:#4a2e10;--cushion:#152c18;
   --panel:#0c1a0e;--panel2:#0e1e10;--border:#1c3020;
   --dim:#5a7a5c;--text:#c8dcc0;--miss:#cc3333;--rec:#dd2222;
@@ -72,11 +72,14 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
 .scard.on{border-color:var(--gold);box-shadow:0 0 12px #c9a84c44}
 .sc-n{font-size:.6rem;text-transform:uppercase;letter-spacing:.11em;color:var(--dim);
        width:100%;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.scard.p1 .sc-n{color:var(--p1)}.scard.p2 .sc-n{color:var(--p2)}
+.scard.p1 .sc-n{color:var(--p1)}.scard.p2 .sc-n{color:var(--p2)}.scard.p3 .sc-n{color:var(--p3)}
 .sc-fr{font-size:.52rem;color:var(--dim)}
 .sc-score{font-size:2.8rem;font-weight:700;line-height:1.05;letter-spacing:-.02em}
-.scard.p1 .sc-score{color:var(--p1)}.scard.p2 .sc-score{color:var(--p2)}
+.scard.p1 .sc-score{color:var(--p1)}.scard.p2 .sc-score{color:var(--p2)}.scard.p3 .sc-score{color:var(--p3)}
 .sc-bklbl{font-size:.52rem;color:var(--dim)}
+/* 3-player compact layout */
+.scorecards.three .sc-score{font-size:2rem}
+.scorecards.three .scard{padding:6px 4px 7px}
 .sc-bk{font-size:.75rem;color:var(--gold)}
 .sc-dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;min-height:11px;margin-top:1px}
 .bdot{width:11px;height:11px;border-radius:50%;border:1.5px solid rgba(0,0,0,.3);flex-shrink:0}
@@ -345,7 +348,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
 .ssub{display:block;font-size:.58rem;color:var(--dim)}
 .sbar{display:flex;align-items:center;margin-top:2px}
 .sbf{height:4px;border-radius:2px;min-width:2px}
-.sbf.b1{background:var(--p1)}.sbf.b2{background:var(--p2)}
+.sbf.b1{background:var(--p1)}.sbf.b2{background:var(--p2)}.sbf.b3{background:var(--p3)}
 
 /* player setup in stats */
 .plyrsetup{background:var(--panel);border:1px solid var(--border);border-radius:10px;
@@ -477,6 +480,21 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
       </div>
     </div>
 
+    <!-- 3rd player (optional) -->
+    <div id="si3Row" style="display:none;margin-bottom:8px">
+      <div style="background:var(--panel);border:2px solid var(--p3)55;border-radius:13px;padding:12px 10px">
+        <div style="font-size:.62rem;color:var(--p3);text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px;font-weight:700">Player 3</div>
+        <input class="plyrinput" id="si3" placeholder="Name…"
+          style="font-size:1rem;font-weight:600;padding:10px 10px;border-color:var(--p3)66;color:var(--p3);margin-bottom:0">
+      </div>
+    </div>
+    <button type="button" id="addP3Btn" onclick="toggleThirdPlayer()"
+      style="width:100%;padding:9px;border-radius:10px;border:1px dashed var(--border);
+        background:transparent;color:var(--dim);font-family:inherit;font-size:.72rem;
+        font-weight:600;cursor:pointer;margin-bottom:8px;letter-spacing:.06em">
+      ＋ Add 3rd Player
+    </button>
+
     <!-- Saved players quick-pick chips -->
     <div id="setupSaved" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px"></div>
 
@@ -588,6 +606,16 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
         <div class="sc-dots" id="bd2"></div>
         <div class="sc-taphere">▶ TAP TO PLAY</div>
       </div>
+      <div class="scard p3" id="c3" onclick="setTurn(3)" style="cursor:pointer;display:none">
+        <div class="sc-n" id="sn3">Player 3</div>
+        <div class="sc-fr" id="sf3">Frames: 0</div>
+        <div class="sc-score" id="sc3">0</div>
+        <div id="snk3" style="font-size:.5rem;color:var(--miss);display:none;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:2px">Tarvitsee snookereita</div>
+        <div class="sc-bklbl">Break</div>
+        <div class="sc-bk" id="sbk3">0</div>
+        <div class="sc-dots" id="bd3"></div>
+        <div class="sc-taphere">▶ TAP TO PLAY</div>
+      </div>
     </div>
 
     <div class="istrip">
@@ -629,7 +657,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
     <button class="bigbtn undo-big" onclick="undo()">UNDO</button>
 
     <!-- FOUL — same squares as pot balls -->
-    <div class="slbl" style="margin-top:9px">Foul — points to opponent, turn changes</div>
+    <div class="slbl" id="foulLabel" style="margin-top:9px">Foul — points to opponent, turn changes</div>
     <div class="potgrid" style="margin-bottom:9px">
       <div class="sq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(4)">4<span class="sub">foul</span></div>
       <div class="sq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(5)">5<span class="sub">foul</span></div>
@@ -645,6 +673,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
         <span style="color:var(--p1);font-size:.75rem;font-weight:700" id="frDispP1">P1</span>
         <span id="framesDisp" style="color:var(--gold);font-size:1rem;font-weight:800">0 – 0</span>
         <span style="color:var(--p2);font-size:.75rem;font-weight:700" id="frDispP2">P2</span>
+        <span style="color:var(--p3);font-size:.75rem;font-weight:700;display:none" id="frDispP3">P3</span>
       </div>
     </div>
     <!-- GAME END — at very bottom so it's never accidentally pressed -->
@@ -1026,6 +1055,13 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
         <span id="brkN2">P2</span><br>
         <span style="font-size:.52rem;font-weight:400;opacity:.7">breaks</span>
       </button>
+      <button id="brkBtn3" onclick="beginFrame(2)" style="display:none;flex:1;padding:16px 8px;
+          border-radius:10px;border:2px solid var(--p3);background:transparent;color:var(--p3);
+          font-family:inherit;font-size:.82rem;font-weight:700;cursor:pointer;line-height:1.3;
+          transition:background .15s">
+        <span id="brkN3">P3</span><br>
+        <span style="font-size:.52rem;font-weight:400;opacity:.7">breaks</span>
+      </button>
     </div>
   </div>
 </div>
@@ -1049,6 +1085,11 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
           background:transparent;color:var(--p2);font-family:inherit;font-size:.75rem;
           font-weight:600;cursor:pointer">
         <span id="fdN2">P2</span>
+      </button>
+      <button type="button" id="fdBtn3" onclick="endFrame(2)" style="display:none;flex:1;padding:12px;
+          border-radius:9px;border:2px solid var(--p3);background:transparent;color:var(--p3);
+          font-family:inherit;font-size:.75rem;font-weight:600;cursor:pointer">
+        <span id="fdN3">P3</span>
       </button>
     </div>
     <button onclick="document.getElementById('frameDlg').style.display='none'"
@@ -1613,7 +1654,8 @@ let gameT0=null;
 let curTab=0;
 let tblInited=false;
 let players=[];
-let pNames=['Player 1','Player 2'];
+let pNames=['Player 1','Player 2','Player 3'];
+let numPlayers=2;
 
 async function boot(){
   await initSQLite();
@@ -1643,6 +1685,7 @@ async function boot(){
       if(d.game) G=d.game;
       if(d.shots) shots=d.shots;
       if(d.snaps) snaps=d.snaps;
+      if(d.numPlayers) numPlayers=d.numPlayers;
       if(d.B) Object.entries(d.B).forEach(([id,p])=>{
         if(B[id]){ B[id].x=p.x; B[id].y=p.y; B[id].potted=!!p.potted; }
       });
@@ -1757,11 +1800,25 @@ function setupGM(n){
     el.style.borderWidth=active?'2.5px':'2px';
   });
 }
+function toggleThirdPlayer(){
+  numPlayers=numPlayers===3?2:3;
+  const row=document.getElementById('si3Row');
+  const btn=document.getElementById('addP3Btn');
+  if(row)row.style.display=numPlayers===3?'block':'none';
+  if(btn)btn.textContent=numPlayers===3?'✕ Remove 3rd Player':'＋ Add 3rd Player';
+}
 function refreshSetupTab(){
   // Sync inputs with current names
   const i1=document.getElementById('si1'),i2=document.getElementById('si2');
+  const i3=document.getElementById('si3');
   if(i1)i1.value=pNames[0];
   if(i2)i2.value=pNames[1];
+  if(i3)i3.value=pNames[2]||'Player 3';
+  // Sync 3rd player toggle state
+  const row=document.getElementById('si3Row');
+  const btn=document.getElementById('addP3Btn');
+  if(row)row.style.display=numPlayers===3?'block':'none';
+  if(btn)btn.textContent=numPlayers===3?'✕ Remove 3rd Player':'＋ Add 3rd Player';
   // Saved player quick-picks
   const sv=document.getElementById('setupSaved');
   if(sv){sv.innerHTML='';
@@ -1772,14 +1829,16 @@ function refreshSetupTab(){
         'background:var(--panel);color:var(--text);font-family:inherit;font-size:.62rem;cursor:pointer';
       b.onclick=()=>{
         const d1=document.getElementById('si1'),d2=document.getElementById('si2');
+        const d3=document.getElementById('si3');
         if(!d1.value||d1.value===pNames[0]) d1.value=p.name;
-        else d2.value=p.name;
+        else if(!d2.value||d2.value===pNames[1]) d2.value=p.name;
+        else if(numPlayers===3&&d3) d3.value=p.name;
       };
       sv.appendChild(b);
     });
   }
   // Current game state
-  const hasGame=G.scores[0]>0||G.scores[1]>0||G.breaks[0]>0||G.breaks[1]>0||shots.length>0;
+  const hasGame=G.scores.some(s=>s>0)||G.breaks.some(b=>b>0)||shots.length>0;
   const cont=document.getElementById('setupContinue');
   if(cont){cont.style.display=hasGame?'block':'none';}
   const cp1=document.getElementById('setupCp1'),cp2=document.getElementById('setupCp2');
@@ -1789,7 +1848,7 @@ function refreshSetupTab(){
   if(cp2)cp2.textContent=pNames[1];
   if(cs1)cs1.textContent=G.scores[0];
   if(cs2)cs2.textContent=G.scores[1];
-  if(cf)cf.textContent=G.frames[0]+' – '+G.frames[1];
+  if(cf)cf.textContent=G.frames.join(' – ');
   // Rec dot
   const rs=document.getElementById('setupRecStatus');
   if(rs)rs.textContent=recording?'● Recording active':reviewing?'▶ Review mode':'Not recording';
@@ -1797,13 +1856,19 @@ function refreshSetupTab(){
 function startNewGame(){
   const n1=document.getElementById('si1')?.value.trim()||'Player 1';
   const n2=document.getElementById('si2')?.value.trim()||'Player 2';
-  pNames=[n1,n2];
-  [n1,n2].forEach(name=>{
+  const names=[n1,n2];
+  if(numPlayers===3){
+    const n3=document.getElementById('si3')?.value.trim()||'Player 3';
+    names.push(n3);
+  }
+  pNames=[...names,'Player 3'].slice(0,3); // keep slot 2 available even in 2-player
+  names.forEach(name=>{
     if(!players.find(p=>p.name===name))
       players.push({name,games:0,at:new Date().toISOString()});
   });
   dbSetSetting('sp_p',JSON.stringify(players));
   dbSetSetting('sp_last',JSON.stringify(pNames));
+  dbSetSetting('sp_numPlayers',String(numPlayers));
   applyNames();
   // Apply game mode
   gameMode=setupGMchoice;
@@ -1811,13 +1876,13 @@ function startNewGame(){
   document.getElementById('gm'+gameMode)?.classList.add('on');
   const gmDesc=document.getElementById('gmDesc');
   if(gmDesc)gmDesc.textContent=GM_DESC[gameMode]||'';
-  // Reset game state silently
-  G={cp:1,scores:[0,0],frames:[0,0],breaks:[0,0],reds:gameMode,colPts:27};
+  // Reset game state
+  G={cp:1,scores:Array(numPlayers).fill(0),frames:Array(numPlayers).fill(0),breaks:Array(numPlayers).fill(0),reds:gameMode,colPts:27};
   shots=[];potH=[];redoH=[];frameHistory=[];photoLog=[];
   reRackWithMode(gameMode);
   updateUI();updateFramesDisp();
-  startRec();    // auto-start recording for new game
-  showBreakDlg(1); // ask who breaks first frame
+  startRec();
+  showBreakDlg(1);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -2139,14 +2204,22 @@ function setTurn(player){
 
 function foul(pts){
   if(reviewing)return;
-  const opp=G.cp===1?1:0;
-  G.scores[opp]+=pts;
   G.breaks[G.cp-1]=0;
   shots.push({player:G.cp-1,type:'foul',shotType:'foul',pts:0,foulPts:pts,
     sec:Math.round((Date.now()-shotT0)/1000),color:'#cc7700'});
-  G.cp=opp+1;
-  resetShotTimer();lastPotType='none';freeBallNext=false;updateFreeBallBadge();setST('std',null);
-  updateUI();flashScore(opp);
+  if(numPlayers===3){
+    const opps=[0,1,2].filter(i=>i!==G.cp-1);
+    opps.forEach(i=>{G.scores[i]+=pts;});
+    G.cp=G.cp>=numPlayers?1:G.cp+1;
+    resetShotTimer();lastPotType='none';freeBallNext=false;updateFreeBallBadge();setST('std',null);
+    updateUI();opps.forEach(i=>flashScore(i));
+  } else {
+    const opp=G.cp===1?1:0;
+    G.scores[opp]+=pts;
+    G.cp=opp+1;
+    resetShotTimer();lastPotType='none';freeBallNext=false;updateFreeBallBadge();setST('std',null);
+    updateUI();flashScore(opp);
+  }
   snap('foul','⛔ Foul +'+pts+'p');
   startShootout();
 }
@@ -2154,7 +2227,7 @@ function foul(pts){
 function endTurn(){
   if(reviewing)return;
   G.breaks[G.cp-1]=0;
-  G.cp=G.cp===1?2:1;
+  G.cp=G.cp>=numPlayers?1:G.cp+1;
   lastPotType='none';freeBallNext=false;updateFreeBallBadge();
   if(shotType==='long'||shotType==='rest'){shotType='std';const sb=document.getElementById('st-std');if(sb){sb.classList.add('on');sb.textContent='Standard';}}
   updateUI();
@@ -2228,7 +2301,7 @@ function setST(t,btnId){
     else stdBtn.textContent='Standard';
   }
   if(t==='safe'){
-    const opp=G.cp===1?2:1;
+    const opp=G.cp>=numPlayers?1:G.cp+1;
     setTurn(opp);
   }
 }
@@ -2237,7 +2310,7 @@ function resetShotTimer(){shotT0=Date.now();}
 // Reset scores to 0-0 (keep ball positions)
 function resetScores(){
   if(!confirm('Reset scores to 0-0?'))return;
-  G.scores=[0,0];G.breaks=[0,0];G.colPts=27;shots=[];
+  G.scores=Array(numPlayers).fill(0);G.breaks=Array(numPlayers).fill(0);G.colPts=27;shots=[];
   updateUI();
 }
 
@@ -2369,36 +2442,33 @@ function updateUI(){
   // Jäljellä olevat maksimipisteet
   const remPts = G.reds > 0 ? G.reds * 8 + 27 : G.colPts;
 
-  [0,1].forEach(i=>{
+  Array.from({length:numPlayers},(_,i)=>i).forEach(i=>{
     document.getElementById('sc'+(i+1)).textContent=G.scores[i];
     document.getElementById('sbk'+(i+1)).textContent=G.breaks[i];
     document.getElementById('sf'+(i+1)).textContent='Frames: '+G.frames[i];
-    
-    // Snooker-laskenta
-    const diff = G.scores[1-i] - G.scores[i]; // Vastustajan pisteet miinus omat
+
+    // Snooker-laskenta — compare against highest-scoring opponent
+    const maxOpp=Math.max(...G.scores.filter((_,idx)=>idx!==i));
+    const diff=maxOpp-G.scores[i];
     const needsSnookers = diff > remPts;
-    
+
     const isActive = G.cp===i+1;
     const classes = ['scard','p'+(i+1)];
     if(isActive) classes.push('on');
-    
-    // Sovelletaan harmaata .dead luokkaa vain jos ei voi enää edes teoriassa voittaa 
-    // Snooker-tarve ei vielä tee peliä täysin pelatuksi, mutta himmennetään hieman halutessa
     if(needsSnookers) classes.push('dead');
     document.getElementById('c'+(i+1)).className=classes.join(' ');
-    
+
     // Näytä tai piilota "Tarvitsee snookereita" -teksti
     const snkEl = document.getElementById('snk'+(i+1));
     if (snkEl) {
       if (needsSnookers) {
         snkEl.style.display = 'block';
-        // Näytetään kuinka monta pistettä eroa kurottavana yli maksimin
-        snkEl.textContent = `Snookereita: -${diff - remPts} p`; 
+        snkEl.textContent = `Snookereita: -${diff - remPts} p`;
       } else {
         snkEl.style.display = 'none';
       }
     }
-    
+
     updateDots(i);
   });
   
@@ -3019,7 +3089,7 @@ function renderStats(){
   const s0=calcS(0),s1=calcS(1);
   document.getElementById('stn1').textContent=pNames[0];
   document.getElementById('stn2').textContent=pNames[1];
-  document.getElementById('stfs').textContent=G.frames[0]+' – '+G.frames[1];
+  document.getElementById('stfs').textContent=G.frames.join(' – ');
   const rows=[
     {l:'Pots',v0:pct(s0.pots,s0.atts)+'%',v1:pct(s1.pots,s1.atts)+'%',
      s0:`(${s0.pots}/${s0.atts})`,s1:`(${s1.pots}/${s1.atts})`,
@@ -3065,7 +3135,7 @@ function renderFlog(){
   }
   const card=document.createElement('div');card.className='flog';
   card.innerHTML=`<div class="flog-hdr"><span>Current Frame</span>
-    <span class="flog-sc">${G.scores[0]}-${G.scores[1]}</span></div>`;
+    <span class="flog-sc">${G.scores.join('-')}</span></div>`;
   c.appendChild(card);
   let run=[],rpl=-1,rpts=0;
   function flush(){
@@ -3111,13 +3181,23 @@ function savePlayers(){
   applyNames();renderStats();
 }
 function applyNames(){
-  ['sn1','sn2'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.textContent=pNames[i]; });
+  ['sn1','sn2','sn3'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.textContent=pNames[i]||'Player '+(i+1); });
   ['stn1','stn2'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.textContent=pNames[i]; });
+  // Show/hide 3rd score card
+  const c3=document.getElementById('c3');
+  const sc=document.querySelector('.scorecards');
+  if(c3) c3.style.display=numPlayers===3?'':'none';
+  if(sc){ if(numPlayers===3) sc.classList.add('three'); else sc.classList.remove('three'); }
   // Update filter chips
   const fp0=document.getElementById('fchip_p0');
   const fp1=document.getElementById('fchip_p1');
   if(fp0)fp0.textContent=pNames[0]||'P1';
   if(fp1)fp1.textContent=pNames[1]||'P2';
+  // Update foul label
+  const fl=document.getElementById('foulLabel');
+  if(fl) fl.textContent=numPlayers===3
+    ?'Foul — points to BOTH opponents, turn changes'
+    :'Foul — points to opponent, turn changes';
   updateFramesDisp();
 }
 function renderSaved(){
@@ -3277,7 +3357,7 @@ function deleteSnap(snapId) {
 function autoSave(){
   try{
     const d={v:'1.0',at:new Date().toISOString(),gameT0,snaps,pNames,shots,frameHistory,
-      G:JSON.parse(JSON.stringify(G)),gameMode};
+      G:JSON.parse(JSON.stringify(G)),gameMode,numPlayers};
     dbSetSetting('snk_auto',JSON.stringify(d));
   }catch(e){console.warn('Auto-save:',e);}
 }
@@ -3384,7 +3464,7 @@ function renderElog(){
       subLine=`<span style="color:${pCol};font-size:.8rem">${pName}</span>`;
       if(s.breakVal>0) subLine+=`<span style="color:var(--gold);font-size:.75rem"> · break ${s.breakVal}</span>`;
     }
-    subLine+=`<span class="emeta" style="margin-left:auto"> ${fmtT(s.gt)} · ${s.G.scores[0]}–${s.G.scores[1]}</span>`;
+    subLine+=`<span class="emeta" style="margin-left:auto"> ${fmtT(s.gt)} · ${s.G.scores.join('–')}</span>`;
     const isFirst=fi===0;
     const isLast=fi===filtered.length-1;
     
@@ -3443,7 +3523,7 @@ function updateCursor(){
   if(reviewing&&snaps[revIdx]){
     const s=snaps[revIdx];
     document.getElementById('sinfo').innerHTML=
-      `<b>${s.desc}</b> · <span class="ev">${fmtT(s.gt)}</span> · ${s.G.scores[0]}–${s.G.scores[1]}`;
+      `<b>${s.desc}</b> · <span class="ev">${fmtT(s.gt)}</span> · ${s.G.scores.join('–')}`;
     document.getElementById('sidx').textContent=(revIdx+1)+' / '+snaps.length;
   }
   document.querySelectorAll('.tmkr').forEach(m=>
@@ -3508,7 +3588,7 @@ function printReport(){
   setTimeout(function(){
     var content=document.getElementById('reportContent').innerHTML;
     var p0=pNames[0],p1=pNames[1];
-    var totalFrames=G.frames[0]+G.frames[1]+frameHistory.length;
+    var totalFrames=G.frames.reduce((a,b)=>a+b,0)+frameHistory.length;
     var dateStr=new Date().toISOString().slice(0,10).replace(/-/g,'_');
     var defName='Report_'+p0.replace(/\s/g,'_')+'vs'+p1.replace(/\s/g,'_')
       +'_frame'+totalFrames+'_'+dateStr;
@@ -3612,6 +3692,7 @@ function loadGame(ev){
       if(d.frameHistory)frameHistory=d.frameHistory;
       if(d.G)G=d.G;
       if(d.gameMode)gameMode=d.gameMode;
+      if(d.numPlayers)numPlayers=d.numPlayers; else numPlayers=pNames.length>=3&&G.scores?.length>=3?3:2;
       // Build combined snapshot list: all past frames + current frame
       snaps=buildAllSnaps(d);
       recording=false;reviewing=false;revIdx=snaps.length-1;setDot('');
@@ -4426,23 +4507,25 @@ function generateReport(){
 
   // ── Overall Match Summary ──
   const dur=fmtT(gameSec);
-  const totalFrames=G.frames[0]+G.frames[1];
+  const totalFrames=G.frames.reduce((a,b)=>a+b,0);
   const overallS0=calcS(0,allShots), overallS1=calcS(1,allShots);
 
-  const totP0 = frameHistory.reduce((a,b)=>a+(b.finalScore?.[0]||0), 0) + G.scores[0];
-  const totP1 = frameHistory.reduce((a,b)=>a+(b.finalScore?.[1]||0), 0) + G.scores[1];
+  const totPts=Array.from({length:numPlayers},(_,i)=>
+    frameHistory.reduce((a,b)=>a+(b.finalScore?.[i]||0),0)+G.scores[i]);
+  const framesStr=G.frames.join(' ('+totPts[0]+') – ');  // only used for 2p below
+  const summaryDetail=numPlayers===3
+    ?dur+' played · '+gameMode+' reds · '+pNames.slice(0,3).map((n,i)=>n+' '+G.frames[i]+' ('+totPts[i]+')').join(' – ')
+    :dur+' played · '+gameMode+' reds · '+G.frames[0]+' ('+totPts[0]+') – '+G.frames[1]+' ('+totPts[1]+')';
 
   if(totalFrames>0){
-    // Multi-frame match: show frames won as big number
     c.appendChild(mkSummaryCard(
       'Match Summary',
-      dur+' played · '+gameMode+' reds · ' + G.frames[0] + ' ('+totP0+') – ' + G.frames[1] + ' ('+totP1+')',
-      G.frames[0] + ' ('+totP0+')', G.frames[1] + ' ('+totP1+')',
+      summaryDetail,
+      G.frames[0]+' ('+totPts[0]+')', G.frames[1]+' ('+totPts[1]+')',
       'Frames won (total pts)', 'Frames won (total pts)',
       overallS0, overallS1
     ));
   } else if(shots.length>0){
-    // Single frame in progress: show current scores
     c.appendChild(mkSummaryCard(
       'Match Summary',
       dur+' played · '+gameMode+' reds',
@@ -4576,7 +4659,7 @@ function generateReport(){
       row.innerHTML=`<div style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;margin-top:${hasImg?3:0}px"></div>
         <div style="flex:1;min-width:0">
           <div style="color:var(--text)">${desc}${pSuffix}</div>
-          <div style="color:var(--dim);font-size:.54rem;margin-top:1px">${fmtT(s.gt)} · ${s.G.scores[0]}–${s.G.scores[1]}</div>
+          <div style="color:var(--dim);font-size:.54rem;margin-top:1px">${fmtT(s.gt)} · ${s.G.scores.join('–')}</div>
         </div>
         ${imgHtml}`;
       row.addEventListener('click',()=>{showTab(3);jumpTo(originalIndex);});
@@ -4647,7 +4730,7 @@ function generateReport(){
     });
     const totRow=document.createElement('div');
     totRow.style.cssText='padding:8px 0;font-size:.7rem;font-weight:600;text-align:center;color:var(--gold)';
-    totRow.textContent='Final: '+pNames[0]+' '+G.frames[0]+' ('+totP0+') – '+G.frames[1]+' ('+totP1+') '+pNames[1];
+    totRow.textContent='Final: '+pNames.slice(0,numPlayers).map((n,i)=>n+' '+G.frames[i]+' ('+totPts[i]+')').join(' – ');
     fhBody.appendChild(totRow);
     fhCard.appendChild(fhBody);
     c.appendChild(fhCard);
@@ -4812,8 +4895,10 @@ function showBreakDlg(frameNum){
   const dlg=document.getElementById('breakDlg');
   document.getElementById('brkN1').textContent=pNames[0];
   document.getElementById('brkN2').textContent=pNames[1];
+  const n3el=document.getElementById('brkN3'); if(n3el) n3el.textContent=pNames[2]||'P3';
+  const btn3=document.getElementById('brkBtn3'); if(btn3) btn3.style.display=numPlayers===3?'':'none';
   const sub=document.getElementById('breakDlgSub');
-  if(sub) sub.textContent='Frame '+(frameNum||G.frames[0]+G.frames[1]+1);
+  if(sub) sub.textContent='Frame '+(frameNum||G.frames.reduce((a,b)=>a+b,0)+1);
   if(dlg) dlg.style.display='flex';
 }
 
@@ -4829,7 +4914,7 @@ function beginFrame(breakerIdx){
   if(stdBtn){stdBtn.classList.remove('on');stdBtn.textContent='Standard';}
   if(safeBtn) safeBtn.classList.add('on');
   updateUI();
-  snap('start','🎱 Frame '+(G.frames[0]+G.frames[1]+1)+' — '+pNames[breakerIdx]+' breaks');
+  snap('start','🎱 Frame '+(G.frames.reduce((a,b)=>a+b,0)+1)+' — '+pNames[breakerIdx]+' breaks');
   showTab(1); // go to Score tab
 }
 
@@ -4837,38 +4922,47 @@ function showFrameDlg(){
   if(reviewing)return;
   document.getElementById('fdN1').textContent=pNames[0];
   document.getElementById('fdN2').textContent=pNames[1];
+  const n3el=document.getElementById('fdN3'); if(n3el) n3el.textContent=pNames[2]||'P3';
+  const btn3=document.getElementById('fdBtn3'); if(btn3) btn3.style.display=numPlayers===3?'':'none';
   document.getElementById('frameDlg').style.display='flex';
 }
 
 function endFrame(winnerIdx){
   document.getElementById('frameDlg').style.display='none';
-  const frameNum=G.frames[0]+G.frames[1]+1;
+  const frameNum=G.frames.reduce((a,b)=>a+b,0)+1;
   frameHistory.push({
     winner:winnerIdx,
     winnerName:pNames[winnerIdx],
     finalScore:[...G.scores],
     frameShots:[...shots],
-    frameSnaps:[...snaps],   // ← save current frame's snapshots
+    frameSnaps:[...snaps],
     frameNum,
     timestamp:new Date().toLocaleTimeString('en')
   });
   G.frames[winnerIdx]++;
-  G.scores=[0,0];G.breaks=[0,0];G.colPts=27;
+  G.scores=Array(numPlayers).fill(0);
+  G.breaks=Array(numPlayers).fill(0);
+  G.colPts=27;
   shots=[];potH=[];redoH=[];
   updateUI();updateFramesDisp();
-  // Stop current recording, save it
   if(recording) stopRec();
-  snap('turn','🏆 Frame '+frameNum+': '+pNames[winnerIdx]+' wins! ('+G.frames[0]+'–'+G.frames[1]+')');
+  snap('turn','🏆 Frame '+frameNum+': '+pNames[winnerIdx]+' wins! ('+G.frames.join('–')+')');
   reRackWithMode(gameMode);
   setTimeout(()=>{
-    startRec();          // start recording for new frame
-    showBreakDlg(frameNum+1); // ask who breaks next frame
+    startRec();
+    showBreakDlg(frameNum+1);
   }, 400);
 }
 
 function concede(){
   if(reviewing)return;
-  const winner=G.cp===1?1:0;
+  let winner;
+  if(numPlayers===3){
+    const others=[0,1,2].filter(i=>i!==G.cp-1);
+    winner=others.reduce((best,i)=>G.scores[i]>G.scores[best]?i:best,others[0]);
+  } else {
+    winner=G.cp===1?1:0;
+  }
   if(!confirm(pNames[G.cp-1]+' concedes. '+pNames[winner]+' wins the frame?'))return;
   endFrame(winner);
 }
@@ -4881,19 +4975,25 @@ function endGame(){
 
   // Step 1: confirm
   const p0=pNames[0]||'Player 1', p1=pNames[1]||'Player 2';
-  const framesTxt=G.frames[0]+' – '+G.frames[1];
+  const playersTxt=numPlayers===3?p0+', '+p1+', '+(pNames[2]||'Player 3'):p0+' vs '+p1;
+  const framesTxt=G.frames.join(' – ');
   if(!confirm('Oletko aivan varma?\n\n'
-    +p0+' vs '+p1+'\nFrame-tilanne: '+framesTxt
+    +playersTxt+'\nFrame-tilanne: '+framesTxt
     +'\n\nRaportti ja JSON tallennetaan automaattisesti.\nSovellus nollataan alkutilaan.'))return;
 
-  // Step 2: if current frame has shots, ask who won it (or skip)
+  // Step 2: if current frame has shots, determine winner
   if(shots.length>0){
-    const ans=confirm('Käynnissä olevalla framella on merkintöjä.\n\n'
-      +'OK → '+p0+' voittaa framen\n'
-      +'Peruuta → '+p1+' voittaa framen\n\n'
-      +'(Peruuta tästä dialogista EI peruuta pelin lopetusta)');
-    const frameWinner=ans?0:1;
-    const frameNum=G.frames[0]+G.frames[1]+1;
+    let frameWinner;
+    if(numPlayers===3){
+      frameWinner=G.scores.indexOf(Math.max(...G.scores));
+    } else {
+      const ans=confirm('Käynnissä olevalla framella on merkintöjä.\n\n'
+        +'OK → '+p0+' voittaa framen\n'
+        +'Peruuta → '+p1+' voittaa framen\n\n'
+        +'(Peruuta tästä dialogista EI peruuta pelin lopetusta)');
+      frameWinner=ans?0:1;
+    }
+    const frameNum=G.frames.reduce((a,b)=>a+b,0)+1;
     frameHistory.push({
       winner:frameWinner,
       winnerName:pNames[frameWinner],
@@ -4913,8 +5013,10 @@ function endGame(){
     +String(now.getDate()).padStart(2,'0');
   const p0s=(p0).replace(/\s+/g,'_');
   const p1s=(p1).replace(/\s+/g,'_');
-  const baseName=dd+'_'+p0s+'vs'+p1s+'_GameEnded_Report';
-  const jsonName=dd+'_'+p0s+'vs'+p1s+'_GameEnded.json';
+  const p2s=numPlayers===3?(pNames[2]||'Player 3').replace(/\s+/g,'_'):'';
+  const gameTag=numPlayers===3?p0s+'vs'+p1s+'vs'+p2s:p0s+'vs'+p1s;
+  const baseName=dd+'_'+gameTag+'_GameEnded_Report';
+  const jsonName=dd+'_'+gameTag+'_GameEnded.json';
   const htmlName=baseName+'.html';
 
   // Step 4: generate report HTML (sync — build content directly)
@@ -4959,7 +5061,7 @@ function endGame(){
       +'<button onclick="window.print()" style="padding:10px 20px;border-radius:7px;border:none;background:#2277bb;color:#fff;font-size:.85rem;cursor:pointer">Print / Save as PDF</button>'
       +'<button onclick="window.close()" style="padding:10px 16px;border-radius:7px;border:1px solid #ccc;background:#f5f5f5;color:#555;font-size:.85rem;cursor:pointer">Close</button>'
       +'</div>'
-      +'<h2>'+p0+' vs '+p1+' \u2014 Match Report <small style="font-size:.7rem;color:#888">'+now.toLocaleDateString()+'</small></h2>'
+      +'<h2>'+playersTxt+' \u2014 Match Report <small style="font-size:.7rem;color:#888">'+now.toLocaleDateString()+'</small></h2>'
       +content
       +'</body></html>';
 
@@ -4983,6 +5085,7 @@ function endGame(){
     // Step 6: full reset to initial tab after short delay
     setTimeout(()=>{
       // Clear all state
+      numPlayers=2;
       G={cp:1,scores:[0,0],frames:[0,0],breaks:[0,0],reds:gameMode,colPts:27};
       shots=[];potH=[];redoH=[];frameHistory=[];
       try{photoLog=[];}catch(e){}
@@ -5009,12 +5112,13 @@ function _triggerDownload(content,mimeType,filename){
 
 function updateFramesDisp(){
   const el=document.getElementById('framesDisp');
-  if(el) el.textContent=G.frames[0]+' – '+G.frames[1];
-  // Update player name labels in frames bar
+  if(el) el.textContent=G.frames.join(' – ');
   const p1=document.getElementById('frDispP1');
   const p2=document.getElementById('frDispP2');
+  const p3el=document.getElementById('frDispP3');
   if(p1) p1.textContent=pNames[0]||'P1';
   if(p2) p2.textContent=pNames[1]||'P2';
+  if(p3el){p3el.textContent=pNames[2]||'P3';p3el.style.display=numPlayers===3?'':'none';}
 }
 
 /* ═══════════════════════════════════════════════════
