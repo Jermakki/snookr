@@ -683,7 +683,6 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
       ⏹ END GAME
     </button>
   </div>
-  </div>
 
   <!-- ══ TABLE ══ -->
   
@@ -1027,6 +1026,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
       <div id="3d-err" style="color:#cc3333;font-size:.65rem;display:none"></div>
     </div>
   </div>
+</div><!-- /pages -->
 
 <!-- Break-off dialog — shown at start of every frame -->
 <div id="breakDlg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);
@@ -1648,8 +1648,7 @@ let aimMode=false;
 let strictRules = true;
 let style='cartoon';
 let recording=false,reviewing=false,revIdx=0;
-let snaps=[],playTmr=null;
-let autoCfg={pot:true,turn:true,miss:true,foul:true};
+let snaps=[],snapSeq=0,playTmr=null;
 let gameT0=null;
 let curTab=0;
 let tblInited=false;
@@ -1682,16 +1681,20 @@ async function boot(){
     const as=dbGetSetting('snk_auto',null);
     if(as){
       const d=JSON.parse(as);
-      if(d.game) G=d.game;
+      if(d.G) G=d.G;
+      if(d.gameT0) gameT0=d.gameT0;
+      if(d.gameMode) gameMode=d.gameMode;
       if(d.shots) shots=d.shots;
-      if(d.snaps) snaps=d.snaps;
+      if(d.snaps){ snaps=d.snaps; snapSeq=snaps.reduce((m,s)=>Math.max(m,(s.id||0)+1),snapSeq); }
+      if(d.frameHistory) frameHistory=d.frameHistory;
       if(d.numPlayers) numPlayers=d.numPlayers;
-      if(d.B) Object.entries(d.B).forEach(([id,p])=>{
-        if(B[id]){ B[id].x=p.x; B[id].y=p.y; B[id].potted=!!p.potted; }
-      });
-      updateUI();
+      if(d.pNames) pNames=d.pNames;
+      // B is empty until the table tab initialises, so seed it directly from the
+      // saved copy (autoSave stores full ball defs) — initSurface reuses existing entries
+      if(d.B&&Object.keys(d.B).length) B=d.B;
+      applyNames();updateUI();updateFramesDisp();
     }
-  }catch(e){}
+  }catch(e){console.warn('Auto-restore:',e);}
 
   showTab(0);
 }
@@ -1872,16 +1875,13 @@ function startNewGame(){
   applyNames();
   // Apply game mode
   gameMode=setupGMchoice;
-  ['gm15','gm10','gm6'].forEach(id=>document.getElementById(id)?.classList.remove('on'));
-  document.getElementById('gm'+gameMode)?.classList.add('on');
-  const gmDesc=document.getElementById('gmDesc');
-  if(gmDesc)gmDesc.textContent=GM_DESC[gameMode]||'';
   // Reset game state
   G={cp:1,scores:Array(numPlayers).fill(0),frames:Array(numPlayers).fill(0),breaks:Array(numPlayers).fill(0),reds:gameMode,colPts:27};
   shots=[];potH=[];redoH=[];frameHistory=[];photoLog=[];
   reRackWithMode(gameMode);
   updateUI();updateFramesDisp();
   startRec();
+  autoSave(); // overwrite any stale auto-restore state from a previous game
   showBreakDlg(1);
 }
 
@@ -1919,6 +1919,7 @@ function initTable(){
   tblInited=true;
   [['ftbl',false],['ctbl',true]].forEach(([id,isC])=>
     initSurface(document.getElementById(id),isC));
+  syncBalls(); // apply restored positions/potted states
 }
 
 function initSurface(el,isC){
@@ -2224,39 +2225,12 @@ function foul(pts){
   startShootout();
 }
 
-function endTurn(){
-  if(reviewing)return;
-  G.breaks[G.cp-1]=0;
-  G.cp=G.cp>=numPlayers?1:G.cp+1;
-  lastPotType='none';freeBallNext=false;updateFreeBallBadge();
-  if(shotType==='long'||shotType==='rest'){shotType='std';const sb=document.getElementById('st-std');if(sb){sb.classList.add('on');sb.textContent='Standard';}}
-  updateUI();
-  snap('turn','🔄 Turn: '+pNames[G.cp-1]);
-  resetShotTimer();
-}
-
-function declareMiss(){
-  if(reviewing)return;
-  shots.push({player:G.cp-1,type:'miss',shotType:'miss',pts:0,
-    sec:Math.round((Date.now()-shotT0)/1000),color:'#cc3333'});
-  ['mo1','mo2'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el){el.classList.remove('fl');void el.offsetWidth;el.classList.add('fl');}
-  });
-  const mb=document.getElementById('mbadge');
-  if(mb){mb.style.display='block';mb.style.animation='none';
-    void mb.offsetWidth;mb.style.animation='bpop .3s cubic-bezier(.34,1.56,.64,1)';
-    setTimeout(()=>mb.style.display='none',1200);}
-  snap('miss','⚠ Miss');
-  resetShotTimer();
-}
-
 function undo(){
   if(reviewing||!potH.length)return;
   const last=potH.pop();redoH.push(last);
   G.scores=[...last.sc0];G.scores[last.player]-=last.pts;
   G.breaks[last.player]=last.bk0;
-  if(last.type==='red')G.reds=Math.min(15,G.reds+1);
+  if(last.type==='red')G.reds=Math.min(gameMode,G.reds+1);
   if(last.colPts0!==undefined) G.colPts=last.colPts0; // restore colour points
   if(last.ballId){
     B[last.ballId].potted=false;
@@ -2307,30 +2281,6 @@ function setST(t,btnId){
 }
 function resetShotTimer(){shotT0=Date.now();}
 
-// Reset scores to 0-0 (keep ball positions)
-function resetScores(){
-  if(!confirm('Reset scores to 0-0?'))return;
-  G.scores=Array(numPlayers).fill(0);G.breaks=Array(numPlayers).fill(0);G.colPts=27;shots=[];
-  updateUI();
-}
-
-/* Game mode descriptions */
-const GM_DESC={
-  15:'Standard — 15 reds · Max break 147',
-  10:'Mini snooker — 10 reds · Max break 107',
-  6: 'Short game — 6 reds · Max break 75'
-};
-function setGameMode(n,btnId){
-  gameMode=n;
-  document.querySelectorAll('#gm15,#gm10,#gm6').forEach(b=>b.classList.remove('on'));
-  document.getElementById(btnId).classList.add('on');
-  const d=document.getElementById('gmDesc');
-  if(d)d.textContent=GM_DESC[n]||'';
-  if(confirm('Apply '+n+'-red game mode? This will re-rack the table.')){
-    reRackWithMode(n);
-  }
-}
-
 function reRackWithMode(n){
   const defs=buildBalls();
   // Hide reds beyond the mode count
@@ -2357,12 +2307,6 @@ function reRackWithMode(n){
   G.reds=n;updateUI();
   // Sync 3D immediately
   setTimeout(()=>window._update3D?.(),50);
-}
-
-// Re-rack: reset ball positions but keep scores
-function reRack(){
-  if(!confirm('Re-rack? (Scores kept)'))return;
-  reRackWithMode(gameMode);
 }
 
 function setPracticePattern(pattern){
@@ -2534,64 +2478,6 @@ function adjustAimOffset(delta,mode){
     if(s1)drawPocketShot(s1,false);
     if(s2)drawPocketShot(s2,true);
   }
-}
-
-function toggleSnapBar(){
-  const bar=document.getElementById('tblSnapBar');
-  const btn=document.getElementById('snapBarBtn');
-  const visible=bar.style.display!=='none'&&bar.style.display!=='';
-  if(visible){exitSnapReview();return;}
-  // Show bar and populate dots
-  bar.style.display='block';
-  btn.style.color='var(--gold)';btn.style.borderColor='var(--gold)';
-  const dots=document.getElementById('tblSnapDots');
-  dots.innerHTML='';
-  if(!snaps.length){dots.innerHTML='<span style="font-size:.6rem;color:var(--dim)">No snapshots yet</span>';return;}
-  snaps.forEach((s,i)=>{
-    const d=document.createElement('div');
-    d.style.cssText='min-width:36px;height:36px;border-radius:8px;border:2px solid var(--border);'+
-      'background:var(--panel);cursor:pointer;display:flex;flex-direction:column;'+
-      'align-items:center;justify-content:center;gap:1px;flex-shrink:0;transition:.12s';
-    const dot=document.createElement('div');
-    dot.style.cssText='width:7px;height:7px;border-radius:50%;background:'+(EVC[s.type]||'#4aacee');
-    const lbl=document.createElement('div');
-    lbl.style.cssText='font-size:.45rem;color:var(--dim);font-family:inherit';
-    lbl.textContent=fmtT(s.gt);
-    d.appendChild(dot);d.appendChild(lbl);
-    d.onclick=()=>tblJumpTo(i);
-    dots.appendChild(d);
-  });
-}
-function tblJumpTo(i){
-  reviewing=true;revIdx=i;
-  const s=snaps[i];
-  if(s.B)Object.assign(B,JSON.parse(JSON.stringify(s.B)));
-  renderTable('quick');renderTable('precise');
-  window._update3D?.();
-  // Show exit review button
-  const exitBtn=document.getElementById('exitReviewBtn');
-  if(exitBtn)exitBtn.style.display='flex';
-  // Highlight active dot
-  const dots=document.getElementById('tblSnapDots');
-  if(dots) [...dots.children].forEach((d,j)=>{
-    d.style.borderColor=j===i?'var(--gold)':'var(--border)';
-    d.style.background=j===i?'#1a2e14':'var(--panel)';
-  });
-  const lbl=document.getElementById('tblSnapLabel');
-  if(lbl)lbl.textContent=(i+1)+'/'+snaps.length+' · '+s.desc?.slice(0,50);
-}
-function exitSnapReview(){
-  reviewing=false;revIdx=snaps.length-1;
-  // Restore live state
-  if(snaps.length) restoreSnap(revIdx);
-  renderTable('quick');renderTable('precise');
-  window._update3D?.();
-  const bar=document.getElementById('tblSnapBar');
-  const btn=document.getElementById('snapBarBtn');
-  const exitBtn=document.getElementById('exitReviewBtn');
-  if(bar)bar.style.display='none';
-  if(btn){btn.style.color='';btn.style.borderColor='';}
-  if(exitBtn)exitBtn.style.display='none';
 }
 
 function tblManualSnap(btn){
@@ -2911,98 +2797,6 @@ function drawPocketShot(surf,isC){
   });
 });
 
-function drawShot(svgEl,cx,cy,dX,dY,gx,gy,hitBall,br,W,H,surf,isC){
-  const bx=toX(hitBall.x,surf),by=toY(hitBall.y,surf);
-
-  // Line-of-centers direction: ghost → object ball
-  const lx=bx-gx,ly=by-gy,ll=Math.sqrt(lx*lx+ly*ly);
-  const ldX=lx/ll,ldY=ly/ll;
-
-  // Contact fraction
-  const dot=Math.max(0,Math.min(1,dX*ldX+dY*ldY));
-  const cutDeg=Math.round(Math.acos(dot)*180/Math.PI);
-  const sinCut=Math.sqrt(Math.max(0,1-dot*dot));const fr=sinCut<0.12?'Full':sinCut<0.38?'3/4':sinCut<0.62?'1/2':sinCut<0.78?'1/4':sinCut<0.84?'3/16':sinCut<0.88?'1/8':sinCut<0.94&&cutDeg>5?'1/16':'Thin';
-
-  const FAR=(W+H)*6;
-
-  // Object ball trajectory: ghost → through ball → wall
-  const objEnd=toWall(gx,gy,ldX,ldY,FAR,W,H,br);
-
-  // ── Find nearest pocket to the object ball trajectory ──
-  let hitPkt=null,bestPD=Infinity;
-  POCKETS.forEach(p=>{
-    const ppx=p.x/100*W,ppy=p.y/100*H;
-    const lineLen=Math.sqrt((objEnd.x-gx)**2+(objEnd.y-gy)**2);if(lineLen<1)return;
-    const udx=(objEnd.x-gx)/lineLen,udy=(objEnd.y-gy)/lineLen;
-    const t=(ppx-gx)*udx+(ppy-gy)*udy;
-    if(t<0||t>lineLen)return;
-    const cx2=gx+udx*t,cy2=gy+udy*t;
-    const pd=Math.sqrt((ppx-cx2)**2+(ppy-cy2)**2);
-    if(pd<br*3.0&&pd<bestPD){bestPD=pd;hitPkt=p;}
-  });
-
-  // ── 1. Aim line: cue ball → ghost (white dashed) ──
-  ln(svgEl,cx,cy,gx,gy,'rgba(255,255,255,.5)',1.5,'8,5');
-
-  // ── 2. Ghost ball ──
-  circ(svgEl,gx,gy,br,'rgba(255,255,255,.1)','rgba(255,255,255,.6)',1.5);
-
-  if(hitPkt){
-    // ── POCKET MODE: draw line locked to pocket center ──
-    const ppx=hitPkt.x/100*W,ppy=hitPkt.y/100*H;
-
-    // Green line: from ghost through object ball into pocket
-    ln(svgEl,gx,gy,ppx,ppy,'rgba(80,255,120,.95)',2.2,'');
-    // Arrow at pocket
-    arr(svgEl,bx,by,ppx,ppy,'#44ff88',br);
-
-    // Pocket glow ring
-    circ(svgEl,ppx,ppy,br*2.8,'rgba(80,255,120,.15)','rgba(80,255,120,.85)',2.5);
-    // Inner bright dot at pocket center
-    circ(svgEl,ppx,ppy,br*.6,'rgba(80,255,120,.9)','none',0);
-
-    // Large POCKET label near pocket
-    const lbx=ppx+br*1.2, lby=ppy-br*3.5;
-    tx(svgEl,lbx,lby,'POCKET','rgba(80,255,120,.95)',Math.max(12,br*1.5));
-
-  } else {
-    // ── NO POCKET: just show object ball direction line (yellow) ──
-    ln(svgEl,gx,gy,objEnd.x,objEnd.y,'rgba(255,200,70,.7)',1.7,'');
-    arr(svgEl,bx,by,objEnd.x,objEnd.y,'#ffc840',br);
-  }
-
-  // ── Labels: fraction + angle — 2× bigger ──
-  const sinCut2=Math.sqrt(Math.max(0,1-dot*dot));
-  const offsetMM=Math.round(52.5*sinCut2*10)/10; // offset = D × sin(θ), 1 decimal
-  const lblSize=Math.max(18,br*2.2);
-  const lblSize2=Math.max(15,br*1.8);
-  const lblSize3=Math.max(12,br*1.5);
-  const lbx=gx+br*3, lby=gy;
-  tx(svgEl,lbx,lby,fr,'#ffd700',lblSize);
-  tx(svgEl,lbx,lby+lblSize+4,cutDeg+'°','rgba(255,220,100,.9)',lblSize2);
-  tx(svgEl,lbx,lby+lblSize+4+lblSize2+3,offsetMM+'mm','rgba(200,230,255,.85)',lblSize3);
-
-  document.getElementById('aimF').textContent=fr;
-  document.getElementById('aimA').textContent=cutDeg+'°';
-  document.getElementById('aimO').textContent=offsetMM+'mm';
-}
-
-// Distance to wall (pixel space)
-function wallT(cx,cy,dx,dy,W,H,br){
-  const ts=[];
-  if(dx>0)ts.push((W-br-cx)/dx);if(dx<0)ts.push((br-cx)/dx);
-  if(dy>0)ts.push((H-br-cy)/dy);if(dy<0)ts.push((br-cy)/dy);
-  return Math.min(...ts.filter(t=>t>0));
-}
-function toWall(x0,y0,dx,dy,far,W,H,br){
-  const fx=x0+dx*far,fy=y0+dy*far;
-  const len=Math.sqrt((fx-x0)**2+(fy-y0)**2);if(len<1)return{x:fx,y:fy};
-  const udx=(fx-x0)/len,udy=(fy-y0)/len;
-  const ct=wallT(x0,y0,udx,udy,W,H,br);
-  const rl=Math.min(len,ct-br);
-  return{x:x0+udx*rl,y:y0+udy*rl};
-}
-
 // SVG helpers
 function ln(sv,x1,y1,x2,y2,col,w,dash){
   const el=document.createElementNS('http://www.w3.org/2000/svg','line');
@@ -3168,18 +2962,6 @@ function renderFlog(){
 /* ═══════════════════════════════════════════════════
    PLAYERS (in Stats tab)
 ═══════════════════════════════════════════════════ */
-function savePlayers(){
-  const n0=document.getElementById('d1').value.trim()||'Player 1';
-  const n1=document.getElementById('d2').value.trim()||'Player 2';
-  pNames=[n0,n1];
-  [n0,n1].forEach(name=>{
-    if(!players.find(p=>p.name===name))
-      players.push({name,games:0,at:new Date().toISOString()});
-  });
-  dbSetSetting('sp_p',JSON.stringify(players));
-  dbSetSetting('sp_last',JSON.stringify(pNames));
-  applyNames();renderStats();
-}
 function applyNames(){
   ['sn1','sn2','sn3'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.textContent=pNames[i]||'Player '+(i+1); });
   ['stn1','stn2'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.textContent=pNames[i]; });
@@ -3200,33 +2982,6 @@ function applyNames(){
     :'Foul — points to opponent, turn changes';
   updateFramesDisp();
 }
-function renderSaved(){
-  // Also populate input fields with current names
-  document.getElementById('d1').value=pNames[0];
-  document.getElementById('d2').value=pNames[1];
-  const div=document.getElementById('savedList');div.innerHTML='';
-  if(!players.length){div.innerHTML='<div style="font-size:.58rem;color:var(--dim)">No saved players</div>';return;}
-  players.forEach(p=>{
-    const item=document.createElement('div');item.className='sitem';
-    item.innerHTML=`<div class="si-n">${p.name}</div>
-      <div class="si-s">${p.games} game${p.games!==1?'s':''}</div>
-      <button class="si-d" onclick="event.stopPropagation();delPlayer('${p.name.replace(/'/g,"\\'")}')">✕</button>`;
-    // Click name → set as P1 if empty, else P2
-    item.querySelector('.si-n').addEventListener('click',()=>{
-      const d1=document.getElementById('d1');
-      const d2=document.getElementById('d2');
-      if(!d1.value||d1.value===pNames[0]) d1.value=p.name;
-      else d2.value=p.name;
-    });
-    div.appendChild(item);
-  });
-}
-function delPlayer(name){
-  players=players.filter(p=>p.name!==name);
-  dbSetSetting('sp_p',JSON.stringify(players));
-  renderSaved();
-}
-
 /* ═══════════════════════════════════════════════════
    RECORDING & TIMELINE
 ═══════════════════════════════════════════════════ */
@@ -3290,7 +3045,7 @@ function snap(type,desc,opts){
   if(!recording)return;
   const {img=null,sim=false}=opts||{};
   snaps.push({
-    id:snaps.length,type,desc,
+    id:snapSeq++,type,desc,
     player:G.cp-1,
     breakVal:G.breaks[G.cp-1],
     gt:gameT0?Math.floor((Date.now()-gameT0)/1000):0,
@@ -3357,7 +3112,7 @@ function deleteSnap(snapId) {
 function autoSave(){
   try{
     const d={v:'1.0',at:new Date().toISOString(),gameT0,snaps,pNames,shots,frameHistory,
-      G:JSON.parse(JSON.stringify(G)),gameMode,numPlayers};
+      G:JSON.parse(JSON.stringify(G)),B:JSON.parse(JSON.stringify(B)),gameMode,numPlayers};
     dbSetSetting('snk_auto',JSON.stringify(d));
   }catch(e){console.warn('Auto-save:',e);}
 }
@@ -3367,11 +3122,6 @@ function manualSnap(){
   snap('manual','📷 Snapshot',{img:captureFelt2D()});
   return true;
 }
-// autoCfg is kept for compat but all events always recorded
-function toggleAuto(btn){
-  const k=btn.dataset.k;autoCfg[k]=!autoCfg[k];btn.classList.toggle('on',autoCfg[k]);
-}
-
 let logFilter='all'; // 'all' | 'errors' | 'p0' | 'p1'
 let elogShowMiss=true;
 let elogShowSnap=true;
@@ -3695,6 +3445,7 @@ function loadGame(ev){
       if(d.numPlayers)numPlayers=d.numPlayers; else numPlayers=pNames.length>=3&&G.scores?.length>=3?3:2;
       // Build combined snapshot list: all past frames + current frame
       snaps=buildAllSnaps(d);
+      snapSeq=snaps.reduce((m,s)=>Math.max(m,(s.id||0)+1),0); // keep ids unique after load
       recording=false;reviewing=false;revIdx=snaps.length-1;setDot('');
       document.getElementById('rstat').innerHTML='<b>Loaded:</b> '+f.name+
         ' ('+frameHistory.length+' frame'+(frameHistory.length!==1?'s':'')
@@ -3721,7 +3472,7 @@ function buildAllSnaps(d){
       // Add a frame-start marker if not already there
       if(frameSnaps.length&&frameSnaps[0].type!=='start'){
         all.push({id:-1,type:'start',
-          desc:'▶ Frame '+(fi+1)+' — '+pNames[fh.winner||0]||'?'+' wins',
+          desc:'▶ Frame '+(fi+1)+' — '+(pNames[fh.winner??0]||'?')+' wins',
           player:null,gt:frameSnaps[0]?.gt||0,wt:'',
           B:frameSnaps[0]?.B||{},G:frameSnaps[0]?.G||{scores:[0,0],frames:[0,0]}});
       }
@@ -3784,27 +3535,6 @@ function filterTimelineFrame(fi,btn){
   });
   renderElog();
   renderTL();
-}
-
-/* ═══════════════════════════════════════════════════
-   FULL RESET
-═══════════════════════════════════════════════════ */
-function resetAll(){
-  if(!confirm('Full reset — clear everything?'))return;
-  stopPlay();if(reviewing)toggleRev();
-  recording=false;snaps=[];revIdx=0;shots=[];setDot('');
-  document.getElementById('rstat').innerHTML='<b>Ready</b>';
-  document.getElementById('bRec').disabled=false;
-  document.getElementById('bStp').disabled=true;
-  document.getElementById('bRev').disabled=true;
-  document.getElementById('bSav').disabled=true;
-  document.querySelectorAll('.ball,.cball,.pkt,.cpkt,.spot').forEach(el=>el.remove());
-  B={};potH=[];redoH=[];frameHistory=[];photoLog=[];
-  G={cp:1,scores:[0,0],frames:[0,0],breaks:[0,0],reds:15,colPts:27};
-  gameSec=0;clearSvgs();tblInited=false;
-  renderTL();renderElog();
-  if(curTab===1)initTable();
-  updateUI();
 }
 
 /* ═══════════════════════════════════════════════════
@@ -3901,16 +3631,6 @@ function _highlightProvider(p){
     lbl.textContent=names[p]||p;
   }
 }
-function toggleAIKeyPanel(){
-  const panel=document.getElementById('aiKeyPanel');
-  if(!panel)return;
-  if(aiProvider==='claude'){
-    // Claude doesn't need a key — just flash info
-    setPhotoStatus('Claude works automatically in Claude.ai preview — no key needed.','#c9a84c');
-    return;
-  }
-  panel.style.display=panel.style.display==='none'?'block':'none';
-}
 function saveAIKey(){
   const key=(document.getElementById('aiKeyInput')?.value||'').trim();
   if(!key){document.getElementById('aiKeyStatus').textContent='Key is empty';return;}
@@ -3922,39 +3642,6 @@ function saveAIKey(){
     if(el)el.textContent='Key stored in browser';
   },2000);
 }
-
-// ── Shared prompt ──────────────────────────────────
-`Analyse this snooker table photo. Identify all visible balls and their positions.
-
-Table orientation:
-- y=0% = BLACK END cushion (where black ball and pink ball start, usually far end)
-- y=100% = BAULK END cushion (where D arc and baulk spots are, usually near end)
-- x=0% = left cushion, x=100% = right cushion
-
-Standard positions (for reference only — use actual positions from the photo):
-- Black: y≈9%, x≈50% | Pink: y≈28%, x≈50% | Blue: y≈50%, x≈50%
-- Brown: y≈79%, x≈50% | Yellow: y≈79%, x≈34% | Green: y≈79%, x≈66%
-- Cue ball (white): typically in D area y≈84-92%
-- Reds triangle: typically y≈20-35%, grouped together
-
-Return ONLY this JSON (no other text, no markdown):
-{"confidence":"high|medium|low","note":"what you see","balls":[
-{"id":"black","x":50,"y":9},
-{"id":"pink","x":50,"y":28},
-{"id":"blue","x":50,"y":50},
-{"id":"brown","x":50,"y":79},
-{"id":"yellow","x":34,"y":79},
-{"id":"green","x":66,"y":79},
-{"id":"cue","x":50,"y":84},
-{"id":"red","x":48,"y":25},
-{"id":"red","x":52,"y":27}
-]}
-
-List each red ball separately with id "red". Omit potted/invisible balls. If you cannot see a clear snooker table, set confidence to "low" and note the issue.`;
-
-// ── API callers ────────────────────────────────────
-
-
 
 // --- KUVAKULMAN TILA JA VAIHTO ---
 let camAngle = 'norm';
@@ -4005,13 +3692,12 @@ List each red ball separately with id "red". Omit potted/invisible balls. If you
 
 // --- API-KUTSUT PÄIVITETTY KÄYTTÄMÄÄN FUNKTIOTA ---
 async function _callClaude(base64,mimeType,apiKey){
-  const headers={'Content-Type':'application/json','anthropic-version':'2023-06-01'};
+  const headers={'Content-Type':'application/json','anthropic-version':'2023-06-01',
+    'anthropic-dangerous-direct-browser-access':'true'}; // required for direct browser calls
   if(apiKey) headers['x-api-key']=apiKey;
-  // Note: Browser CORS will likely block this if called directly from a non-preview environment,
-  // but adding the headers makes it "correct" for proxy or preview use.
   const response=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',headers,
-    body:JSON.stringify({model:'claude-3-5-sonnet-20240620',max_tokens:1200,
+    body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1200,
       messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mimeType,data:base64}},
         {type:'text',text:getBallDetectPrompt()}
@@ -4039,7 +3725,7 @@ async function _callOpenAI(base64,mimeType,apiKey){
 
 async function _callGemini(base64,mimeType,apiKey){
   if(!apiKey)throw new Error('No Gemini API key');
-  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+apiKey,
+  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+apiKey,
     {method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[
       {inlineData:{mimeType:mimeType,data:base64}},
@@ -4940,31 +4626,19 @@ function endFrame(winnerIdx){
     timestamp:new Date().toLocaleTimeString('en')
   });
   G.frames[winnerIdx]++;
+  // Record the win event BEFORE stopRec() — snap() ignores events once recording=false
+  snap('turn','🏆 Frame '+frameNum+': '+pNames[winnerIdx]+' wins! ('+G.frames.join('–')+')');
+  if(recording) stopRec();
   G.scores=Array(numPlayers).fill(0);
   G.breaks=Array(numPlayers).fill(0);
   G.colPts=27;
   shots=[];potH=[];redoH=[];
   updateUI();updateFramesDisp();
-  if(recording) stopRec();
-  snap('turn','🏆 Frame '+frameNum+': '+pNames[winnerIdx]+' wins! ('+G.frames.join('–')+')');
   reRackWithMode(gameMode);
   setTimeout(()=>{
     startRec();
     showBreakDlg(frameNum+1);
   }, 400);
-}
-
-function concede(){
-  if(reviewing)return;
-  let winner;
-  if(numPlayers===3){
-    const others=[0,1,2].filter(i=>i!==G.cp-1);
-    winner=others.reduce((best,i)=>G.scores[i]>G.scores[best]?i:best,others[0]);
-  } else {
-    winner=G.cp===1?1:0;
-  }
-  if(!confirm(pNames[G.cp-1]+' concedes. '+pNames[winner]+' wins the frame?'))return;
-  endFrame(winner);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -5095,7 +4769,8 @@ function endGame(){
       updateFreeBallBadge();
       reRackWithMode(gameMode);
       updateUI();updateFramesDisp();
-      goTab(0); // back to Initial tab
+      autoSave(); // clear the ended game from auto-restore storage
+      showTab(0); // back to Initial tab
       setDot('');
     },600);
   },120);
@@ -5323,7 +4998,6 @@ Recording starts automatically when a new game begins. Events appear as a list �
 <div style="background:#0a140b;border-radius:8px;padding:10px 12px">
 <div style="color:var(--gold);font-size:.72rem;font-weight:600;margin-bottom:6px">💡 TIPS</div>
 • <b>Auto-save:</b> The game is saved automatically to browser storage. If you close the app by accident it will offer to restore the game.<br>
-• <b>Reset Scores / Full Reset</b> are in ⚙ Settings.<br>
 • <b>Frames:</b> Play multiple frames by pressing "End Frame" — each frame's break log is stored separately in the Result tab.<br>
 • <b>Home screen:</b> Add to home screen for app-like access (Share → Add to Home Screen).
 </div>`;
@@ -5425,7 +5099,6 @@ Tallennus käynnistyy automaattisesti. Tapahtumat näkyvät listana — napauta 
 <div style="background:#0a140b;border-radius:8px;padding:10px 12px">
 <div style="color:var(--gold);font-size:.72rem;font-weight:600;margin-bottom:6px">💡 VINKKEJÄ</div>
 • <b>Auto-tallennus:</b> Peli tallentuu automaattisesti selaimen muistiin. Jos suljet sovelluksen vahingossa, se tarjoutuu palauttamaan pelin.<br>
-• <b>Reset Scores / Full Reset</b> löytyy <b>⚙ Settings</b> -paneelista.<br>
 • <b>Erät:</b> Pelaa useita eriä painamalla "End Frame" — historialoki kertyy Result-välilehdelle erikseen per erä.<br>
 • <b>Kotinäyttö:</b> Lisää kirjanmerkki kotinäytölle (Jaa → Lisää kotinäyttöön).
 </div>`;
