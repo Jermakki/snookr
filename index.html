@@ -70,7 +70,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
         border-radius:11px;padding:8px 6px 9px;display:flex;flex-direction:column;
         align-items:center;gap:1px;transition:border-color .25s,box-shadow .25s;min-width:0}
 .scard.on{border-color:var(--gold);box-shadow:0 0 12px #c9a84c44}
-.sc-n{font-size:.6rem;text-transform:uppercase;letter-spacing:.11em;color:var(--dim);
+.sc-n{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.11em;color:var(--dim);
        width:100%;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .scard.p1 .sc-n{color:var(--p1)}.scard.p2 .sc-n{color:var(--p2)}.scard.p3 .sc-n{color:var(--p3)}
 .sc-fr{font-size:.52rem;color:var(--dim)}
@@ -80,7 +80,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
 /* 3-player compact layout */
 .scorecards.three .sc-score{font-size:2rem}
 .scorecards.three .scard{padding:6px 4px 7px}
-.sc-bk{font-size:.75rem;color:var(--gold)}
+.sc-bk{font-size:1.5rem;font-weight:700;color:var(--gold)}
 .sc-dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;min-height:11px;margin-top:1px}
 .bdot{width:11px;height:11px;border-radius:50%;border:1.5px solid rgba(0,0,0,.3);flex-shrink:0}
 .sc-taphere{font-size:.48rem;letter-spacing:.12em;text-transform:uppercase;
@@ -131,6 +131,7 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
 .sq.inf{background:var(--panel);border:1.5px dashed var(--border);
          box-shadow:none;cursor:default;color:var(--dim)}
 .sq.inf .redsv{font-size:3rem;color:var(--gold);font-weight:700;line-height:1}
+.sq.foulsq{aspect-ratio:2.2/1;border-radius:9px}
 
 /* shot type — same height as UNDO, 2× bigger text */
 .strow{display:flex;gap:5px;margin-bottom:8px}
@@ -659,14 +660,20 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
     <!-- FOUL — same squares as pot balls -->
     <div class="slbl" id="foulLabel" style="margin-top:9px">Foul — points to opponent, turn changes</div>
     <div class="potgrid" style="margin-bottom:9px">
-      <div class="sq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(4)">4<span class="sub">foul</span></div>
-      <div class="sq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(5)">5<span class="sub">foul</span></div>
-      <div class="sq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(6)">6<span class="sub">foul</span></div>
-      <div class="sq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(7)">7<span class="sub">foul</span></div>
+      <div class="sq foulsq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(4)">4<span class="sub">foul</span></div>
+      <div class="sq foulsq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(5)">5<span class="sub">foul</span></div>
+      <div class="sq foulsq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(6)">6<span class="sub">foul</span></div>
+      <div class="sq foulsq" style="background:linear-gradient(145deg,#b0b0b0,#606060);font-size:1.6rem" onclick="foul(7)">7<span class="sub">foul</span></div>
     </div>
 
     <!-- FRAME END — same height as undo -->
     <button class="bigbtn frame-big" onclick="showFrameDlg()">END FRAME</button>
+    <!-- GAME END — right after End Frame -->
+    <button class="bigbtn" onclick="endGame()"
+      style="background:transparent;color:#a05a5a;border:2px solid #441a1a;
+        font-size:1.1rem;font-weight:700;margin-top:6px;letter-spacing:.06em;opacity:.6">
+      ⏹ END GAME
+    </button>
     <div style="font-size:.54rem;color:var(--dim);padding-left:2px;margin-top:4px;margin-bottom:4px">
       <div style="width:100%;padding:12px 10px;border-radius:10px;border:2px solid var(--border);
         background:var(--panel);display:flex;justify-content:space-between;align-items:center">
@@ -676,12 +683,6 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
         <span style="color:var(--p3);font-size:.75rem;font-weight:700;display:none" id="frDispP3">P3</span>
       </div>
     </div>
-    <!-- GAME END — at very bottom so it's never accidentally pressed -->
-    <button class="bigbtn" onclick="endGame()"
-      style="background:transparent;color:#883333;border:2px solid #441a1a;
-        font-size:1.1rem;font-weight:900;margin-top:18px;letter-spacing:.06em;opacity:.7">
-      ⏹ END GAME
-    </button>
   </div>
 
   <!-- ══ TABLE ══ -->
@@ -692,6 +693,35 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
 
   <!-- ══ TIMELINE ══ -->
   <div class="page" id="pTimeline">
+    <!-- Import / Export card -->
+    <div class="rcard" style="margin-bottom:4px">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);
+        font-size:.56rem;color:var(--dim);text-transform:uppercase;letter-spacing:.12em">
+        💾 Save &amp; Load Game
+      </div>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+        <!-- Save -->
+        <button onclick="saveGame()"
+          style="width:100%;padding:14px;border-radius:10px;
+            border:2px solid #6aaa6a;background:#0a1e0a;
+            color:#6aaa6a;font-family:inherit;font-size:.78rem;
+            font-weight:600;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:8px">
+          💾 Save Game (.json)
+        </button>
+        <!-- Load -->
+        <button onclick="trigLoad()"
+          style="width:100%;padding:14px;border-radius:10px;
+            border:2px solid var(--border);background:var(--panel);
+            color:var(--text);font-family:inherit;font-size:.78rem;
+            font-weight:600;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:8px">
+          📂 Load Saved Game
+        </button>
+        <input type="file" id="fInp" accept=".json" style="display:none" onchange="loadGame(event)">
+      </div>
+    </div>
+
     <div class="rcard">
       <div class="rtop">
         <div class="rstat" id="rstat"><b>Ready</b></div>
@@ -745,35 +775,6 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
         </label>
       </div>
       <div class="elog" id="elog"><div style="padding:9px;font-size:.58rem;color:var(--dim)">—</div></div>
-    </div>
-
-    <!-- Import / Export card -->
-    <div class="rcard" style="margin-top:4px">
-      <div style="padding:8px 12px;border-bottom:1px solid var(--border);
-        font-size:.56rem;color:var(--dim);text-transform:uppercase;letter-spacing:.12em">
-        💾 Save &amp; Load Game
-      </div>
-      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
-        <!-- Save -->
-        <button onclick="saveGame()"
-          style="width:100%;padding:14px;border-radius:10px;
-            border:2px solid #6aaa6a;background:#0a1e0a;
-            color:#6aaa6a;font-family:inherit;font-size:.78rem;
-            font-weight:600;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;
-            display:flex;align-items:center;justify-content:center;gap:8px">
-          💾 Save Game (.json)
-        </button>
-        <!-- Load -->
-        <button onclick="trigLoad()"
-          style="width:100%;padding:14px;border-radius:10px;
-            border:2px solid var(--border);background:var(--panel);
-            color:var(--text);font-family:inherit;font-size:.78rem;
-            font-weight:600;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;
-            display:flex;align-items:center;justify-content:center;gap:8px">
-          📂 Load Saved Game
-        </button>
-        <input type="file" id="fInp" accept=".json" style="display:none" onchange="loadGame(event)">
-      </div>
     </div>
 
     <!-- Guide buttons -->
