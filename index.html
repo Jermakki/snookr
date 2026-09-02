@@ -2150,13 +2150,25 @@ function scoreIt(type,color,pts,ballId){
 function pot(type,color,pts){
   if(reviewing)return;
 
-  // ── Free ball: next pot counts as a red (1pt), then clear flag ──
+  // ── Free ball: while reds remain, it's played as a red (1pt).
+  //    Once all reds are gone (colours phase), it's played in place of
+  //    whichever colour is actually "on" — it must score THAT ball's
+  //    value, not the value of the colour physically nominated. ──
   if(freeBallNext){
     freeBallNext=false;
     updateFreeBallBadge();
-    // Score it as 1 point, lastPotType → 'red' so color can follow
-    scoreIt('red',color,1,null);
-    snap('pot','Free ball potted (+1p)');
+    if(G.reds>0){
+      // Score it as 1 point, lastPotType → 'red' so color can follow
+      scoreIt('red',color,1,null);
+      snap('pot','Free ball potted (+1p)');
+    } else {
+      // Colours phase — free ball counts at the on-ball's real value,
+      // and must advance the sequence by that same amount so the
+      // yellow→green→brown→blue→pink→black order stays in sync.
+      const activePts=activeColourPts();
+      scoreIt(type,color,activePts,null);
+      snap('colorpot','Free ball potted (+'+activePts+'p)');
+    }
     return;
   }
 
@@ -4501,6 +4513,17 @@ function toggleStrictRules() {
   updatePotButtons();
 }
 
+// Point value of whichever colour is currently "on" in the end-game
+// sequence (yellow→green→brown→blue→pink→black), based on G.colPts.
+function activeColourPts(){
+  if(G.colPts===27) return 2;  // yellow
+  if(G.colPts===25) return 3;  // green
+  if(G.colPts===22) return 4;  // brown
+  if(G.colPts===18) return 5;  // blue
+  if(G.colPts===13) return 6;  // pink
+  if(G.colPts===7)  return 7;  // black
+  return 0;
+}
 function updateFreeBallBadge(){
   const badge=document.getElementById('freeBallBadge');
   if(badge) badge.style.display=freeBallNext?'block':'none';
