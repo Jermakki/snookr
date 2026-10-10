@@ -152,8 +152,12 @@ async function handleCuescore(url) {
     let ids = [];
     if (tournament) ids = [tournament];
     else if (player) {
-      const page = await fetch(`https://cuescore.com/player/x/${player}/tournaments?s=0`,
-        { headers: { 'user-agent': 'Mozilla/5.0 SnookR/1.0' } });
+      // /player/x/<id> redirects to the canonical /player/<Name>/<id> profile but drops any subpath,
+      // so resolve the profile URL first; its /tournaments subpage lists every tournament played.
+      const ua = { headers: { 'user-agent': 'Mozilla/5.0 SnookR/1.0' } };
+      const profile = await fetch(`https://cuescore.com/player/x/${player}`, ua);
+      if (!profile.ok) return json({ error: 'CueScore player page ' + profile.status }, 502);
+      const page = await fetch(profile.url.replace(/\/$/, '') + '/tournaments', ua);
       if (!page.ok) return json({ error: 'CueScore player page ' + page.status }, 502);
       const html = await page.text();
       ids = [...new Set([...html.matchAll(/\/tournament\/[^"'\s]+\/(\d+)/g)].map(x => x[1]))];
