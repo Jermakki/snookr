@@ -324,6 +324,14 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
 .h-frame{display:grid;grid-template-columns:1fr auto 1fr 1fr;gap:8px;align-items:center;
          padding:6px 0;border-bottom:1px solid var(--border);font-size:.65rem}
 .h-frame span:last-child{text-align:right;color:var(--gold)}
+.h-filter{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 2px 8px}
+.h-filter input,.h-filter select{padding:7px 8px;border-radius:7px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);font-family:inherit;font-size:.62rem;color-scheme:dark;min-width:0}
+.h-filter #histQ{flex:1 1 140px}
+.h-stbl{width:100%;border-collapse:collapse;margin-top:8px;font-size:.65rem}
+.h-stbl th{font-size:.6rem;color:var(--text);padding:4px;font-weight:700}
+.h-stbl td{padding:5px 4px;border-bottom:1px solid var(--border);text-align:center;color:var(--text)}
+.h-stbl td:nth-child(2){color:var(--dim);font-size:.55rem;text-transform:uppercase;letter-spacing:.06em}
 .h-help{margin-top:12px}
 .h-help summary{cursor:pointer;list-style:none}
 .h-help .rpt-body{font-size:.62rem;line-height:1.7;color:var(--text)}
@@ -1077,6 +1085,18 @@ body{display:flex;flex-direction:column;max-width:620px;margin:0 auto;
     </div>
     <input type="file" id="histFile" accept=".json,application/json" multiple style="display:none" onchange="importHistoryFiles(event)">
   </div>
+  <div class="h-filter">
+    <input id="histQ" list="histNames" placeholder="🔍 Pelaaja…" oninput="setHistFilter()">
+    <datalist id="histNames"></datalist>
+    <select id="histPeriod" onchange="setHistPeriod(this.value)">
+      <option value="">Koko aika</option><option value="30">30 pv</option><option value="90">90 pv</option>
+      <option value="year">Tämä vuosi</option><option value="lastyear">Viime vuosi</option>
+    </select>
+    <input type="date" id="histFrom" onchange="document.getElementById('histPeriod').value='';setHistFilter()" title="Alkaen">
+    <input type="date" id="histTo" onchange="document.getElementById('histPeriod').value='';setHistFilter()" title="Asti">
+    <button class="h-btn" id="histClear" onclick="clearHistFilter()">✕</button>
+    <span id="histCount" class="h-lbl"></span>
+  </div>
   <div id="histStatus" class="h-lbl" style="white-space:pre-line;margin:0 2px 8px"></div>
   <div id="histBody"></div>
   <details class="rpt-section h-help">
@@ -1687,31 +1707,43 @@ window.addEventListener('online', () => { syncSettings(); flushPendingMatches();
 const BALL_PTS={red:1,yellow:2,green:3,brown:4,blue:5,pink:6,black:7};
 const BALL_COL={red:'#cc2222',yellow:'#c8a800',green:'#1e7328',brown:'#7b4a2a',blue:'#1a4aaa',pink:'#d05888',black:'#202020'};
 const CUESCORE_DEFAULT_ID=65158465;
-let hist={matches:[],players:[],loaded:false,open:{},showAll:false};
+let hist={matches:[],players:[],loaded:false,open:{},showAll:false,q:'',from:'',to:''};
 const HIST_TOP=4; // cards shown before "show all"
 
 const escH=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-// events: {p, kind:'pot'|'foul'|'end', ball?, pts?}; n = player count
+// events: {p, kind:'pot'|'foul'|'miss'|'safe'|'end', ball?, pts?, sec?}; n = player count.
+// f.st[i] = {shots, pots, misses, safes, safeOk, fouls, sec} — CueScore-style shot stats;
+// a safety succeeds when the opponent's next shot is not a pot.
 function buildFrame(events,n,winner,scores){
   const f={scores:Array(n).fill(0),winner,breaks:[...Array(n)].map(()=>[]),
-    potted:[...Array(n)].map(()=>({})),fouls:Array(n).fill(0),potPts:Array(n).fill(0)};
-  let cur=null,run=0;
+    potted:[...Array(n)].map(()=>({})),fouls:Array(n).fill(0),potPts:Array(n).fill(0),
+    st:[...Array(n)].map(()=>({shots:0,pots:0,misses:0,safes:0,safeOk:0,fouls:0,sec:0}))};
+  let cur=null,run=0,safeBy=null;
   const close=()=>{if(cur!==null&&run>0)f.breaks[cur].push(run);cur=null;run=0;};
   events.forEach(e=>{
     if(e.p==null||e.p<0||e.p>=n)return;
+    const st=f.st[e.p];
+    if(e.sec>0)st.sec+=e.sec;
+    if(e.kind==='end'){close();return;}
+    st.shots++;
+    if(safeBy!==null&&safeBy!==e.p&&e.kind!=='pot')f.st[safeBy].safeOk++;
+    safeBy=null;
     if(e.kind==='pot'){
       if(cur!==e.p){close();cur=e.p;}
-      run+=e.pts;f.scores[e.p]+=e.pts;f.potPts[e.p]+=e.pts;
+      st.pots++;run+=e.pts;f.scores[e.p]+=e.pts;f.potPts[e.p]+=e.pts;
       if(e.ball)f.potted[e.p][e.ball]=(f.potted[e.p][e.ball]||0)+1;
-    }else{
-      close();
-      if(e.kind==='foul'&&e.pts>0){
-        f.fouls[e.p]++;
-        for(let i=0;i<n;i++)if(i!==e.p)f.scores[i]+=e.pts;
-      }
+      return;
+    }
+    close();
+    if(e.kind==='miss')st.misses++;
+    else if(e.kind==='safe'){st.safes++;safeBy=e.p;}
+    else if(e.kind==='foul'){
+      st.fouls++;
+      if(e.pts>0){f.fouls[e.p]++;for(let i=0;i<n;i++)if(i!==e.p)f.scores[i]+=e.pts;}
     }
   });
+  if(safeBy!==null)f.st[safeBy].safeOk++; // frame ended on a safety
   close();
   if(scores)f.scores=[...scores]; // source's own final score wins (manual edits)
   if(f.winner==null&&n===2&&f.scores[0]!==f.scores[1])f.winner=f.scores[0]>f.scores[1]?0:1;
@@ -1727,9 +1759,9 @@ function normalizeSnookr(d){
   const n=Math.max(2,...fh.map(f=>(f.finalScore||[]).length));
   const players=d.pNames.slice(0,n).map(s=>String(s).trim());
   const frames=fh.map(f=>buildFrame(f.frameShots.map(s=>
-    BALL_PTS[s.type]?{p:s.player,kind:'pot',ball:s.type,pts:s.pts||0}
-    :s.type==='foul'?{p:s.player,kind:'foul',pts:s.foulPts||0}
-    :{p:s.player,kind:'end'}),n,f.winner,f.finalScore));
+    BALL_PTS[s.type]?{p:s.player,kind:'pot',ball:s.type,pts:s.pts||0,sec:s.sec}
+    :s.type==='foul'?{p:s.player,kind:'foul',pts:s.foulPts||0,sec:s.sec}
+    :{p:s.player,kind:s.type==='safety'?'safe':s.type==='missed_pot'?'miss':'end',sec:s.sec}),n,f.winner,f.finalScore));
   const t0=typeof d.gameT0==='number'?new Date(d.gameT0):new Date(d.at);
   return {sourceRef:'snookr:'+d.at,source:'snookr',playedAt:(isNaN(t0)?new Date(d.at):t0).toISOString(),
     discipline:d.gameMode?d.gameMode+'-reds':null,players,frameWins:frameWinsOf(frames,n),frames};
@@ -1759,10 +1791,10 @@ function normalizeMontonen(d){
 
 // CueScore match (from /api/cuescore): notes like "A pot red", "B foul 4", "A inning end", "frame start"
 function normalizeCuescore(m,nameById){
-  const frames=[];let ev=null,win=null;
+  const frames=[];let ev=null,win=null;const innT0={};
   const flush=()=>{if(ev&&ev.length)frames.push(buildFrame(ev,2,win));ev=null;win=null;};
-  (m.notes||[]).forEach(({note})=>{
-    const t=String(note).split(/\s+/);
+  (m.notes||[]).forEach(({note,time})=>{
+    const t=String(note).split(/\s+/),tm=Date.parse(time);
     if(t[0]==='frame'&&t[1]==='start'){flush();ev=[];return;}
     if(t[0]==='frame'&&t[1]==='end'){flush();return;}
     if(t[0]!=='A'&&t[0]!=='B')return;
@@ -1773,12 +1805,16 @@ function normalizeCuescore(m,nameById){
       ev.push({p,kind:'pot',ball:free?'red':t[2],pts:free?1:BALL_PTS[t[2]]});return;
     }
     if(t[1]==='frame'&&t[2]==='win'){win=p;return;}
-    if((t[1]==='inning'&&t[2]==='end')||t[1]==='miss'||t[1]==='safe')ev.push({p,kind:'end'});
+    if(t[1]==='inning'&&t[2]==='start'){innT0[p]=tm;return;}
+    if(t[1]==='inning'&&t[2]==='end'){ev.push({p,kind:'end',sec:innT0[p]?(tm-innT0[p])/1000:0});innT0[p]=null;return;}
+    if(t[1]==='miss'||t[1]==='safe')ev.push({p,kind:t[1]});
   });
   flush();
   const nm=pl=>nameById[pl?.playerId]||pl?.name||'?';
   return {sourceRef:'cuescore:'+m.matchId,source:'cuescore',playedAt:m.starttime||new Date().toISOString(),
-    discipline:m.discipline,venue:m.venue,tournament:m.tournament,
+    discipline:m.discipline,venue:m.venue,tournament:m.tournament,round:m.roundName,table:m.table,
+    url:'https://cuescore.com/match/?matchId='+m.matchId,
+    durationSec:m.starttime&&m.stoptime?(Date.parse(m.stoptime)-Date.parse(m.starttime))/1000:null,
     players:[nm(m.playerA),nm(m.playerB)],images:[m.playerA?.image||null,m.playerB?.image||null],
     frameWins:[m.scoreA||0,m.scoreB||0],frames};
 }
@@ -1818,10 +1854,54 @@ async function loadHistory(){
   }
 }
 
-function histStats(){
+// Search (player name, accent-insensitive) + date range from the History filter bar
+const histNorm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function histFiltered(){
+  const q=histNorm(hist.q.trim());
+  const from=hist.from?Date.parse(hist.from+'T00:00:00'):null,to=hist.to?Date.parse(hist.to+'T23:59:59'):null;
+  return hist.matches.filter(m=>{
+    const t=Date.parse(m.playedAt);
+    if(from&&t<from)return false;
+    if(to&&t>to)return false;
+    return !q||m.players.some(n=>histNorm(n).includes(q));
+  });
+}
+function setHistFilter(){
+  hist.q=document.getElementById('histQ').value;
+  hist.from=document.getElementById('histFrom').value;
+  hist.to=document.getElementById('histTo').value;
+  renderHistory();
+}
+function setHistPeriod(v){
+  const d=new Date(),iso=x=>x.toISOString().slice(0,10);
+  hist.to='';hist.from='';
+  if(v==='30'||v==='90'){d.setDate(d.getDate()-Number(v));hist.from=iso(d);}
+  else if(v==='year')hist.from=d.getFullYear()+'-01-01';
+  else if(v==='lastyear'){hist.from=(d.getFullYear()-1)+'-01-01';hist.to=(d.getFullYear()-1)+'-12-31';}
+  document.getElementById('histFrom').value=hist.from;document.getElementById('histTo').value=hist.to;
+  renderHistory();
+}
+function clearHistFilter(){
+  hist.q=hist.from=hist.to='';
+  ['histQ','histFrom','histTo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('histPeriod').value='';
+  renderHistory();
+}
+
+// Sum frame shot stats (f.st) for player i; null when the source had no shot log
+function sumShotStats(frames,i){
+  const t={shots:0,pots:0,misses:0,safes:0,safeOk:0,fouls:0,sec:0};let any=false;
+  frames.forEach(f=>{const s=f.st?.[i];if(!s)return;any=true;Object.keys(t).forEach(k=>t[k]+=s[k]||0);});
+  return any?t:null;
+}
+const pctFloor=(a,b)=>(b?Math.floor(a/b*100):0)+'%'; // CueScore rounds down, 0 attempts = 0%
+const fmtSec=s=>Math.floor(s/60)+'m '+String(Math.floor(s%60)).padStart(2,'0')+'s';
+
+function histStats(list){
   const P={},H={};
-  const pl=name=>P[name]=P[name]||{name,m:0,mw:0,f:0,fw:0,hb:0,b30:0,b50:0,pts:0,potted:{},image:null};
-  hist.matches.forEach(m=>{
+  const pl=name=>P[name]=P[name]||{name,m:0,mw:0,f:0,fw:0,hb:0,b30:0,b50:0,pts:0,potted:{},image:null,
+    ss:{shots:0,pots:0,misses:0,safes:0,safeOk:0,fouls:0,sec:0},hasSS:false};
+  list.forEach(m=>{
     const n=m.players.length;
     m.players.forEach((name,i)=>{
       const s=pl(name);s.m++;
@@ -1833,6 +1913,8 @@ function histStats(){
         (f.breaks[i]||[]).forEach(b=>{s.hb=Math.max(s.hb,b);if(b>=30)s.b30++;if(b>=50)s.b50++;});
         Object.entries(f.potted[i]||{}).forEach(([k,v])=>s.potted[k]=(s.potted[k]||0)+v);
       });
+      const ss=sumShotStats(m.frames,i);
+      if(ss){s.hasSS=true;Object.keys(s.ss).forEach(k=>s.ss[k]+=ss[k]);}
     });
     if(n===2){
       const key=[...m.players].sort().join('\u0000');
@@ -1856,7 +1938,13 @@ function renderHistory(){
   const el=document.getElementById('histBody');if(!el)return;
   if(!hist.loaded&&!hist.matches.length){el.innerHTML='<div class="h-empty">Ladataan…</div>';return;}
   if(!hist.matches.length){el.innerHTML='<div class="h-empty">Ei otteluita vielä. Pelaa peli loppuun (End Game) tai tuo JSON / CueScore.</div>';return;}
-  const {P,H}=histStats();const byName=Object.fromEntries(P.map(p=>[p.name,p]));
+  const list=histFiltered();
+  const dl=document.getElementById('histNames');
+  if(dl)dl.innerHTML=[...new Set(hist.matches.flatMap(m=>m.players))].sort().map(n=>`<option value="${escH(n)}">`).join('');
+  const cnt=document.getElementById('histCount');
+  if(cnt)cnt.textContent=list.length===hist.matches.length?hist.matches.length+' ottelua':list.length+' / '+hist.matches.length+' ottelua';
+  if(!list.length){el.innerHTML='<div class="h-empty">Ei hakua vastaavia otteluita.</div>';return;}
+  const {P,H}=histStats(list);const byName=Object.fromEntries(P.map(p=>[p.name,p]));
   let h='';
   const more=Math.max(H.length,P.length)>HIST_TOP;
   (hist.showAll?H:H.slice(0,HIST_TOP)).forEach(x=>{
@@ -1870,12 +1958,14 @@ function renderHistory(){
     const st=(l,v)=>`<div><div class="h-lbl">${l}</div><div class="h-val">${v}</div></div>`;
     h+=`<div class="rpt-section h-card"><div class="h-name">${histAvatar(p,30)}<b>${escH(p.name)}</b></div><div class="h-grid">
       ${st('Matches won',p.mw+'/'+p.m)}${st('Win %',p.m?Math.round(p.mw/p.m*100)+'%':'–')}${st('Frames won',p.fw+'/'+p.f)}
-      ${st('High break',p.hb)}${st('30+ / 50+',p.b30+' / '+p.b50)}${st('Pts / frame',p.f?Math.round(p.pts/p.f):'–')}</div>
+      ${st('High break',p.hb)}${st('30+ / 50+',p.b30+' / '+p.b50)}${st('Pts / frame',p.f?Math.round(p.pts/p.f):'–')}
+      ${p.hasSS?st('Pot %',pctFloor(p.ss.pots,p.ss.pots+p.ss.misses))+st('Safety %',pctFloor(p.ss.safeOk,p.ss.safes))
+        +st('Avg shot',p.ss.shots&&p.ss.sec?fmtSec(p.ss.sec/p.ss.shots):'–'):''}</div>
       <div class="h-balls">${histBalls(p.potted)}</div></div>`;
   });
   h+='</div>';
   if(more)h+=`<button class="h-btn" style="margin-top:8px;width:100%" onclick="hist.showAll=!hist.showAll;renderHistory()">${hist.showAll?'▲ Näytä vähemmän':'▼ Näytä kaikki pelaajat ('+P.length+') ja H2H:t ('+H.length+')'}</button>`;
-  hist.matches.forEach(m=>{
+  list.forEach(m=>{
     const d=new Date(m.playedAt);const n=m.players.length;
     const tot=m.players.map((_,i)=>m.frames.reduce((a,f)=>a+(f.scores[i]||0),0));
     const hb=m.players.map((_,i)=>Math.max(0,...m.frames.flatMap(f=>f.breaks[i]||[])));
@@ -1895,6 +1985,24 @@ function renderHistory(){
         h+=`<div class="h-frame"><span>Frame ${i+1}</span><b>${f.scores.join(' – ')}</b><span class="h-lbl">HB ${fhb.join(' | ')}</span>
           <span>${f.winner!=null?escH(m.players[f.winner]):''}</span></div>`;
       });
+      const meta=[m.round,m.table?'Pöytä '+m.table:null,m.venue,m.discipline,
+        m.durationSec?'Match time '+Math.round(m.durationSec/60)+'m':null].filter(Boolean);
+      if(meta.length||m.url)h+=`<div class="h-lbl" style="margin-top:8px">${escH(meta.join(' · '))}
+        ${m.url?` · <a href="${escH(m.url)}" target="_blank" rel="noopener" style="color:var(--p1)">CueScore ↗</a>`:''}</div>`;
+      const ss=m.players.map((_,i)=>sumShotStats(m.frames,i));
+      if(n===2&&ss[0]&&ss[1]){
+        const tsec=ss[0].sec+ss[1].sec;
+        const row=(l,a,b)=>`<tr><td>${a}</td><td>${l}</td><td>${b}</td></tr>`;
+        h+=`<table class="h-stbl"><tr><th>${escH(m.players[0])}</th><th></th><th>${escH(m.players[1])}</th></tr>
+          ${row('Total points',...m.players.map((_,i)=>m.frames.reduce((a,f)=>a+(f.potPts?.[i]||0),0)))}
+          ${row('Balls potted',...ss.map(x=>x.pots))}
+          ${row('Pot success',...ss.map(x=>pctFloor(x.pots,x.pots+x.misses)))}
+          ${row('Safety success',...ss.map(x=>pctFloor(x.safeOk,x.safes)))}
+          ${row('Fouls',...ss.map(x=>x.fouls))}
+          ${row('Highest break',...hb)}
+          ${tsec?row('Average shot time',...ss.map(x=>x.shots?fmtSec(x.sec/x.shots):'–')):''}
+          ${tsec?row('Table time',...ss.map(x=>pctFloor(x.sec,tsec))):''}</table>`;
+      }
       m.players.forEach((name,i)=>{
         const pot={};m.frames.forEach(f=>Object.entries(f.potted[i]||{}).forEach(([k,v])=>pot[k]=(pot[k]||0)+v));
         h+=`<div class="h-lbl" style="margin-top:8px">${escH(name)} totals</div><div class="h-balls">${histBalls(pot)}</div>`;
@@ -1956,7 +2064,7 @@ async function finishImport(list,errs){
   const st=document.getElementById('histStatus');
   let msg='';
   if(list.length){
-    try{const r=await postMatches(list);msg=`Tuotu ${r.saved} ottelua`+(r.skipped?`, ${r.skipped} oli jo historiassa`:'')+'.';}
+    try{const r=await postMatches(list);msg=`Tuotu ${r.saved} uutta ottelua`+(r.updated?`, ${r.updated} päivitetty`:'')+(r.skipped?`, ${r.skipped} oli jo historiassa`:'')+'.';}
     catch(e){msg='⚠ Tallennus epäonnistui: '+e.message;}
   }else msg='Ei tuotavia otteluita.';
   if(errs.length)msg+='\n'+errs.join('\n');

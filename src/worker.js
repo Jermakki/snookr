@@ -67,19 +67,30 @@ async function handleMatches(request, env, user, url) {
     const list = (Array.isArray(body) ? body : [body]).filter(validMatch);
     if (!list.length) return json({ error: 'no valid matches' }, 400);
     const now = new Date().toISOString();
+    // Re-importing from the same source refreshes the match (e.g. CueScore stats added later);
+    // a different source never overwrites (montonen.uk copy of a SnookR game keeps the SnookR original).
+    const { results: existing } = await env.DB
+      .prepare('SELECT source_ref, source FROM matches WHERE source_ref IN (SELECT value FROM json_each(?))')
+      .bind(JSON.stringify(list.map(m => m.sourceRef))).all();
+    const have = Object.fromEntries(existing.map(r => [r.source_ref, r.source]));
     const stmt = env.DB.prepare(
       `INSERT INTO matches (id, source, source_ref, played_at, discipline, venue, player_a, player_b,
          frames_a, frames_b, data, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(source_ref) DO NOTHING`);
-    const res = await env.DB.batch(list.map(m => {
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(source_ref) DO UPDATE SET played_at = excluded.played_at, discipline = excluded.discipline,
+         venue = excluded.venue, player_a = excluded.player_a, player_b = excluded.player_b,
+         frames_a = excluded.frames_a, frames_b = excluded.frames_b, data = excluded.data
+       WHERE matches.source = excluded.source`);
+    await env.DB.batch(list.map(m => {
       const data = JSON.stringify(m);
       return stmt.bind(crypto.randomUUID(), m.source, m.sourceRef, m.playedAt, m.discipline || null,
         m.venue || null, m.players[0], m.players[1], m.frameWins[0] || 0, m.frameWins[1] || 0,
         data.length <= MAX_VALUE_BYTES ? data : JSON.stringify({ ...m, frames: m.frames.map(f => ({ ...f, shots: undefined })) }),
         user, now);
     }));
-    const saved = res.reduce((a, r) => a + (r.meta.changes || 0), 0);
-    return json({ saved, skipped: list.length - saved });
+    const saved = list.filter(m => !have[m.sourceRef]).length;
+    const updated = list.filter(m => have[m.sourceRef] === m.source).length;
+    return json({ saved, updated, skipped: list.length - saved - updated });
   }
   if (request.method === 'DELETE') {
     const id = url.pathname.split('/')[3];
@@ -117,7 +128,9 @@ const slimMatch = (m, t) => ({
   matchId: m.matchId, discipline: m.discipline || t?.discipline, starttime: m.starttime, stoptime: m.stoptime,
   scoreA: m.scoreA, scoreB: m.scoreB, raceTo: m.raceTo, matchstatus: m.matchstatus,
   playerA: slimPlayer(m.playerA), playerB: slimPlayer(m.playerB),
-  tournament: t ? t.name : null, venue: m.table?.venue?.name || null, notes: m.notes || [],
+  tournament: t ? t.name : null, tournamentId: m.tournamentId || t?.tournamentId || null,
+  roundName: m.roundName || null, matchno: m.matchno || null, table: m.table?.name || null,
+  venue: m.table?.venue?.name || null, notes: m.notes || [],
 });
 
 async function handleCuescore(url) {
