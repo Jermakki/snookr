@@ -6,6 +6,8 @@ The app is a single static page in `public/index.html`. The file includes the HT
 
 It is hosted on Cloudflare Workers (`wrangler.jsonc`): `public/` is served as static assets and `src/worker.js` handles `/api/settings`, syncing the browser's sql.js `settings` table to a D1 database (schema in `migrations/`). The user is identified by the Cloudflare Access header `Cf-Access-Authenticated-User-Email`. Keys starting with `snk_aikey_` (AI API keys) are never synced — both the client and the Worker filter them. Without a backend (file://, `python -m http.server`) the client sync turns itself off and the app works locally only.
 
+The History tab (`pHistory`) shows a match history shared by all users, stored in the D1 `matches` table via `/api/matches`. `endGame` posts each finished game (queued in `snk_pending_matches` when offline). Imports normalize three sources into one match shape (`normalizeSnookr`, `normalizeMontonen`, `normalizeCuescore` in `public/index.html`); `source_ref` deduplicates re-imports. `/api/cuescore` proxies api.cuescore.com and the CueScore player page (no CORS there); `players.cuescore_id` maps CueScore players to SnookR names.
+
 Keep related UI, style, and behavior changes close to the existing sections in `public/index.html`. If the app grows beyond one file, prefer `public/` for static assets, `src/` for Worker code, and `tests/` for automated checks.
 
 ## Build, Test, and Development Commands
