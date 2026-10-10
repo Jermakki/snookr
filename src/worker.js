@@ -163,10 +163,15 @@ export default {
     if (url.pathname.startsWith('/api/')) {
       const user = getUser(request, env);
       if (!user) return json({ error: 'unauthorized' }, 401);
-      if (url.pathname === '/api/settings') return handleSettings(request, env, user);
-      if (url.pathname === '/api/matches' || url.pathname.startsWith('/api/matches/')) return handleMatches(request, env, user, url);
-      if (url.pathname === '/api/players') return handlePlayers(request, env);
-      if (url.pathname === '/api/cuescore' && request.method === 'GET') return handleCuescore(url);
+      try {
+        if (url.pathname === '/api/settings') return await handleSettings(request, env, user);
+        if (url.pathname === '/api/matches' || url.pathname.startsWith('/api/matches/')) return await handleMatches(request, env, user, url);
+        if (url.pathname === '/api/players') return await handlePlayers(request, env);
+        if (url.pathname === '/api/cuescore' && request.method === 'GET') return await handleCuescore(url);
+      } catch (e) {
+        // Surface D1 errors (e.g. "no such table: matches" before the migration is run)
+        return json({ error: String(e.message || e) }, 500);
+      }
       return json({ error: 'not found' }, 404);
     }
     return env.ASSETS.fetch(request);
