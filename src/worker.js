@@ -7,6 +7,10 @@ const isPrivateKey = k => k.startsWith('snk_aikey_'); // API keys never leave th
 const CS_API = 'https://api.cuescore.com';
 const CS_MAX_TOURNAMENTS = 40; // free plan allows 50 subrequests per invocation
 
+// Only these users may delete matches (comma-separated ADMIN_EMAILS var in wrangler.jsonc / .dev.vars)
+const isAdmin = (env, user) =>
+  String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).includes(user);
+
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 
@@ -59,6 +63,7 @@ async function handleMatches(request, env, user, url) {
     return json({
       matches: matches.results.map(r => ({ ...JSON.parse(r.data), id: r.id, createdBy: r.created_by })),
       players: players.results,
+      canDelete: isAdmin(env, user),
     });
   }
   if (request.method === 'POST') {
@@ -93,6 +98,7 @@ async function handleMatches(request, env, user, url) {
     return json({ saved, updated, skipped: list.length - saved - updated });
   }
   if (request.method === 'DELETE') {
+    if (!isAdmin(env, user)) return json({ error: 'only an admin can delete matches' }, 403);
     const id = url.pathname.split('/')[3];
     if (!id) return json({ error: 'missing id' }, 400);
     const r = await env.DB.prepare('DELETE FROM matches WHERE id = ?').bind(id).run();

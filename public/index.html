@@ -1846,7 +1846,7 @@ async function loadHistory(){
     const r=await fetch('/api/matches');
     if(!r.ok)throw new Error(r.status===401?'kirjaudu sisään (Cloudflare Access)':await apiError(r));
     const d=await r.json();
-    hist.matches=d.matches;hist.players=d.players;hist.loaded=true;
+    hist.matches=d.matches;hist.players=d.players;hist.canDelete=!!d.canDelete;hist.loaded=true;
     renderHistory();
   }catch(e){
     const el=document.getElementById('histBody');
@@ -2007,7 +2007,8 @@ function renderHistory(){
         const pot={};m.frames.forEach(f=>Object.entries(f.potted[i]||{}).forEach(([k,v])=>pot[k]=(pot[k]||0)+v));
         h+=`<div class="h-lbl" style="margin-top:8px">${escH(name)} totals</div><div class="h-balls">${histBalls(pot)}</div>`;
       });
-      h+=`<button class="h-btn h-del" onclick="deleteHistMatch('${escH(m.id)}')">🗑 Poista ottelu</button></div>`;
+      if(hist.canDelete)h+=`<button class="h-btn h-del" onclick="deleteHistMatch('${escH(m.id)}')">🗑 Poista ottelu</button>`;
+      h+='</div>';
     }
     h+='</div>';
   });
@@ -2018,7 +2019,7 @@ async function deleteHistMatch(id){
   const m=hist.matches.find(x=>x.id===id);if(!m)return;
   if(!confirm('Poistetaanko ottelu kaikilta?\n\n'+m.players.join(' vs ')+' '+m.frameWins.join('–')))return;
   const r=await fetch('/api/matches/'+encodeURIComponent(id),{method:'DELETE'});
-  if(r.ok){hist.matches=hist.matches.filter(x=>x.id!==id);renderHistory();}else alert('Poisto epäonnistui: HTTP '+r.status);
+  if(r.ok){hist.matches=hist.matches.filter(x=>x.id!==id);renderHistory();}else alert('Poisto epäonnistui: '+await apiError(r));
 }
 
 async function importHistoryFiles(ev){
